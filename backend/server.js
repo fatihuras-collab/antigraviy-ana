@@ -71,7 +71,9 @@ app.use((err, _req, res, _next) => {
 
 // ── Sunucuyu başlat ──────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const HOST = '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
   console.log(`\n======================================================`);
   console.log(`✅ Anaokulu Stok Takip & Tüketim Sistemi Yayında!`);
   console.log(`🌐 Web Paneli (Arayüz) : http://localhost:${PORT}`);
