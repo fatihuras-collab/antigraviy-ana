@@ -11,9 +11,18 @@
  *   GET    /api/stock/current     — Güncel stok (critical filtreli)
  */
 
-require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+const fs   = require('fs');
+const path = require('path');
 
-const path    = require('path');
+// ── Yerel ortamda .env varsa yükle (Railway/Cloud ortamlarında process.env doğrudan kullanılır)
+const rootEnv = path.join(__dirname, '../.env');
+const localEnv = path.join(__dirname, '.env');
+if (fs.existsSync(rootEnv)) {
+  require('dotenv').config({ path: rootEnv });
+} else if (fs.existsSync(localEnv)) {
+  require('dotenv').config({ path: localEnv });
+}
+
 const express = require('express');
 const app     = express();
 

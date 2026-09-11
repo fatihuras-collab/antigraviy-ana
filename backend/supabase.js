@@ -1,14 +1,48 @@
+const fs = require('fs');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
-require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Yerel geliştirme için .env dosyası varsa yükle; cloud/Railway ortamında process.env doğrudan kullanılır
+const rootEnv = path.join(__dirname, '../.env');
+const localEnv = path.join(__dirname, '.env');
+if (fs.existsSync(rootEnv)) {
+  require('dotenv').config({ path: rootEnv });
+} else if (fs.existsSync(localEnv)) {
+  require('dotenv').config({ path: localEnv });
+}
+
+// Tırnak işaretlerini ve boşlukları temizleme yardımcısı
+const cleanEnv = (val) => (val || '').trim().replace(/^["']|["']$/g, '');
+
+const SUPABASE_URL = cleanEnv(process.env.SUPABASE_URL);
+const SUPABASE_SERVICE_ROLE_KEY = cleanEnv(
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_KEY ||
+  process.env.SUPABASE_SECRET
+);
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('SUPABASE_URL veya SUPABASE_SERVICE_ROLE_KEY .env dosyasında eksik!');
+  const detectedKeys = Object.keys(process.env).filter(k =>
+    k.toUpperCase().includes('SUPABASE') || k.toUpperCase().includes('RAILWAY') || k === 'PORT' || k === 'NODE_ENV'
+  );
+
+  console.error('\n❌ [HATA] Supabase ortam değişkenleri bulunamadı!');
+  console.error(`   SUPABASE_URL: ${SUPABASE_URL ? '✓ Algılandı' : '✗ EKSİK'}`);
+  console.error(`   SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY ? '✓ Algılandı' : '✗ EKSİK'}`);
+  console.error(`   Algılanan ilgili değişkenler: [${detectedKeys.join(', ')}]`);
+  console.error('   Lütfen Railway Variables sekmesinde SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY tanımlandığından emin olun.\n');
+
+  throw new Error('Supabase ortam değişkenleri eksik! Lütfen Railway Variables sekmesini kontrol edin.');
 }
 
 // service_role key: RLS'i bypass eder — sadece backend'de kullan!
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  }
+});
 
 module.exports = supabase;
+
