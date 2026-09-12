@@ -102,20 +102,11 @@ function initQuickChips() {
 function initFormHandler() {
   const applyBtn = document.getElementById('apply-btn');
   const portionInput = document.getElementById('portion-input');
-  const dateInput = document.getElementById('consumption-date');
-
-  if (dateInput) {
-    const now = new Date();
-    const offsetMs = (now.getTimezoneOffset() + 180) * 60 * 1000;
-    const trDate = new Date(now.getTime() + offsetMs);
-    dateInput.value = trDate.toISOString().split('T')[0];
-  }
 
   if (!applyBtn || !portionInput) return;
 
   applyBtn.addEventListener('click', async () => {
     const count = parseInt(portionInput.value, 10);
-    const selectedDate = dateInput?.value;
 
     if (isNaN(count) || count <= 0) {
       showAlert('Geçersiz Değer', 'Lütfen 1 veya daha büyük bir öğrenci sayısı girin.', 'error');
@@ -128,13 +119,10 @@ function initFormHandler() {
     hideResults();
 
     try {
-      const payload = { portion_count: count };
-      if (selectedDate) payload.date = selectedDate;
-
       const response = await fetch(`${API_BASE_URL}/api/daily-consumption`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ portion_count: count })
       });
 
       const data = await response.json();

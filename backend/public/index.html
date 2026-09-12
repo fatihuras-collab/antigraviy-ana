@@ -117,59 +117,38 @@
         </div>
 
         <form id="consumption-form" class="consumption-form" onsubmit="return false;">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
-            <div class="form-group" style="margin-bottom: 0;">
-              <label for="consumption-date" class="form-label">İşlem Tarihi</label>
-              <div class="input-wrapper">
-                <div class="input-prefix-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                  </svg>
-                </div>
-                <input 
-                  type="date" 
-                  id="consumption-date" 
-                  name="consumption_date" 
-                  class="form-input" 
-                />
+          <div class="form-group">
+            <label for="portion-input" class="form-label">Bugün kaç öğrenci var?</label>
+            <div class="input-wrapper">
+              <div class="input-prefix-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
               </div>
+              <input 
+                type="number" 
+                id="portion-input" 
+                name="portion_count" 
+                class="form-input" 
+                min="1" 
+                max="500" 
+                value="70" 
+                placeholder="Örn: 70"
+                required
+              />
+              <span class="input-suffix">Öğrenci</span>
             </div>
-            <div class="form-group" style="margin-bottom: 0;">
-              <label for="portion-input" class="form-label">Öğrenci Sayısı</label>
-              <div class="input-wrapper">
-                <div class="input-prefix-icon">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
-                </div>
-                <input 
-                  type="number" 
-                  id="portion-input" 
-                  name="portion_count" 
-                  class="form-input" 
-                  min="1" 
-                  max="500" 
-                  value="70" 
-                  placeholder="Örn: 70"
-                  required
-                />
-                <span class="input-suffix">Öğrenci</span>
-              </div>
-            </div>
-          </div>
 
-          <!-- Hızlı seçim butonları -->
-          <div class="quick-chips" style="margin-bottom: 20px;">
-            <span class="quick-chip-label">Hızlı Seç:</span>
-            <button type="button" class="chip-btn" data-val="60">60</button>
-            <button type="button" class="chip-btn active" data-val="70">70</button>
-            <button type="button" class="chip-btn" data-val="75">75</button>
-            <button type="button" class="chip-btn" data-val="80">80</button>
-            <button type="button" class="chip-btn" data-val="90">90</button>
+            <!-- Hızlı seçim butonları -->
+            <div class="quick-chips">
+              <span class="quick-chip-label">Hızlı Seç:</span>
+              <button type="button" class="chip-btn" data-val="60">60</button>
+              <button type="button" class="chip-btn active" data-val="70">70</button>
+              <button type="button" class="chip-btn" data-val="75">75</button>
+              <button type="button" class="chip-btn" data-val="80">80</button>
+              <button type="button" class="chip-btn" data-val="90">90</button>
+            </div>
           </div>
 
           <div class="form-actions">
