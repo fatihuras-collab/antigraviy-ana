@@ -37,6 +37,13 @@ const OGUN_ISIMLERI = {
   ikindi:   'İkindi Kahvaltısı'
 };
 
+const WEEK_BASE_DATES = {
+  1: '2026-09-07',
+  2: '2026-09-14',
+  3: '2026-09-21',
+  4: '2026-09-28'
+};
+
 // ─── POST /api/daily-consumption ─────────────────────────────────────────────
 router.post('/', async (req, res) => {
   try {
@@ -103,7 +110,7 @@ router.post('/', async (req, res) => {
         .select(`
           id,
           meal_type,
-          menu_date,
+          date,
           recipes (
             id,
             meal_name,
@@ -121,7 +128,7 @@ router.post('/', async (req, res) => {
             )
           )
         `)
-        .eq('menu_date', targetDate);
+        .eq('date', targetDate);
 
       if (!mErr && mRows && mRows.length > 0) {
         menuRows = mRows;
@@ -132,13 +139,6 @@ router.post('/', async (req, res) => {
 
     // ÖNCELİK 2: monthly_menu'de bulunamazsa weekly_menu fallback
     if (!menuRows || menuRows.length === 0) {
-      const WEEK_BASE_DATES = {
-        1: '2026-09-07',
-        2: '2026-09-14',
-        3: '2026-09-21',
-        4: '2026-09-28'
-      };
-
       let weekNum = req.body.week_number;
       if (!weekNum) {
         if (targetDate >= '2026-09-28') weekNum = 4;
@@ -215,45 +215,11 @@ router.post('/', async (req, res) => {
       }
     }
 
-    // Eğer doğrudan tarih aralığında bulunamazsa, ayın haftasına göre (weekNum) getir
     if (!menuRows || menuRows.length === 0) {
-      const targetValidFrom = WEEK_BASE_DATES[weekNum] || '2026-09-07';
-      const { data: fbRows, error: fbErr } = await supabase
-        .from('weekly_menu')
-        .select(`
-          id,
-          day_of_week,
-          meal_type,
-          valid_from,
-          valid_to,
-          recipes (
-            id,
-            meal_name,
-            meal_type,
-            recipe_ingredients (
-              id,
-              product_id,
-              quantity_per_portion,
-              products (
-                id,
-                name,
-                unit,
-                critical_threshold
-              )
-            )
-          )
-        `)
-        .eq('day_of_week', dayOfWeek)
-        .eq('valid_from', targetValidFrom);
-
-      if (fbErr) throw fbErr;
-      menuRows = fbRows;
-    }
-
-    if (!menuRows || menuRows.length === 0) {
+      const weekendNote = (dayOfWeek === 6 || dayOfWeek === 7) ? ' Hafta sonu yemekhane kapalıdır.' : '';
       return res.status(404).json({
         success: false,
-        error: `${dayName} (${targetDate}) için haftalık menüde kayıt bulunamadı.`,
+        error: `${dayName} (${targetDate}) için yemek listesinde kayıt bulunamadı.${weekendNote}`,
         day_of_week: dayOfWeek,
         day_name:    dayName
       });
