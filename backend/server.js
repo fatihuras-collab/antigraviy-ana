@@ -78,6 +78,7 @@ app.use('/api/evening-report',     require('./routes/reports'));
 app.use('/api/meal-feedback',      require('./routes/feedback'));
 app.use('/api/recipes',            require('./routes/recipes'));
 app.use('/api/settings',           require('./routes/settings'));
+app.use('/api/menu',               require('./routes/menu'));
 
 // ── 404 yakalayıcı ───────────────────────────────────────────────────────────
 app.use((req, res) => {
@@ -123,5 +124,7 @@ app.listen(PORT, HOST, () => {
   console.log(`   Bugünün öğünleri    : GET  /api/meal-feedback/today`);
   console.log(`   Reçete listesi      : GET  /api/recipes`);
   console.log(`   Reçete ekle         : POST /api/recipes`);
+  console.log(`   Menü parse (AI)     : POST /api/menu/parse`);
+  console.log(`   Menü kaydet         : POST /api/menu/save`);
   console.log(`======================================================\n`);
 });

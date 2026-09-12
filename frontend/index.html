@@ -88,6 +88,14 @@
         </svg>
         Ürünler &amp; Reçeteler
       </button>
+      <button id="tab-menuupload" class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('menuupload')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        Aylık Menü Yükle
+      </button>
     </nav>
 
     <!-- ════ PANEL 1: TÜKETİM GİRİŞİ ════ -->
@@ -563,6 +571,106 @@
         </div>
       </section>
 
+    </main>
+
+    <!-- ════ PANEL 5: AYLIK MENÜ YÜKLE ════ -->
+    <main id="panel-menuupload" class="main-content hidden">
+      <section class="card">
+        <div class="card-header">
+          <div class="card-icon-bubble" style="background:rgba(99,102,241,0.12);border-color:rgba(99,102,241,0.25);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+          </div>
+          <div>
+            <h2 class="card-title">Aylık Menü Yükle</h2>
+            <p class="card-description">Menü görselini (JPG/PNG) yükleyin. Claude AI metni okur ve aşağıda düzenlenebilir tablo oluşturur. Onayladığınızda aylık menü tablosuna kaydedilir.</p>
+          </div>
+        </div>
+
+        <!-- Ay/Yıl + Dosya Yükleme -->
+        <div class="mu-upload-form">
+          <div class="mu-row">
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="mu-month">Ay</label>
+              <select id="mu-month" class="mu-select">
+                <option value="1">Ocak</option><option value="2">Şubat</option>
+                <option value="3">Mart</option><option value="4">Nisan</option>
+                <option value="5">Mayıs</option><option value="6">Haziran</option>
+                <option value="7">Temmuz</option><option value="8">Ağustos</option>
+                <option value="9">Eylül</option><option value="10">Ekim</option>
+                <option value="11">Kasım</option><option value="12">Aralık</option>
+              </select>
+            </div>
+            <div class="form-group" style="flex:1">
+              <label class="form-label" for="mu-year">Yıl</label>
+              <input type="number" id="mu-year" class="mu-select" value="2026" min="2024" max="2030">
+            </div>
+          </div>
+
+          <div class="mu-dropzone" id="mu-dropzone">
+            <input type="file" id="mu-file-input" accept="image/jpeg,image/png,image/webp" class="mu-file-hidden">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <p class="mu-dropzone-title">Dosyayı sürükleyin veya tıklayın</p>
+            <p class="mu-dropzone-hint">JPG, PNG, WebP — maks. 20 MB</p>
+            <p class="mu-dropzone-filename hidden" id="mu-filename"></p>
+          </div>
+
+          <div class="form-actions" style="justify-content:center;margin-top:8px;">
+            <button class="btn btn-primary" id="mu-parse-btn" onclick="menuParse()" disabled>
+              <span id="mu-parse-spinner" class="btn-spinner hidden"></span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              AI ile Menüyü Oku
+            </button>
+          </div>
+
+          <div id="mu-parse-alert" class="alert alert-error hidden" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Önizleme Tablosu -->
+        <div id="mu-preview-section" class="hidden" style="margin-top:32px;">
+          <div class="section-heading-row" style="margin-bottom:16px;">
+            <h3 class="section-heading" style="color:#a5b4fc;">📋 Menü Önizlemesi — Düzenleyebilirsiniz</h3>
+            <span id="mu-gun-count" class="badge" style="background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;">0 gün</span>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table mu-table" id="mu-preview-table">
+              <thead>
+                <tr>
+                  <th>Tarih</th>
+                  <th>Gün</th>
+                  <th style="color:#fbbf24;">☀️ Kahvaltı</th>
+                  <th style="color:#34d399;">🍽 Öğle</th>
+                  <th style="color:#c084fc;">🌙 İkindi</th>
+                </tr>
+              </thead>
+              <tbody id="mu-preview-tbody"></tbody>
+            </table>
+          </div>
+
+          <!-- Kaydet Butonu -->
+          <div class="form-actions" style="justify-content:flex-end;margin-top:20px;gap:12px;">
+            <button class="btn btn-outline-sm" onclick="menuResetPreview()">Temizle &amp; Yeniden Yükle</button>
+            <button class="btn" id="mu-save-btn" onclick="menuSave()"
+              style="background:linear-gradient(135deg,#6366f1,#4f46e5);color:#fff;box-shadow:0 6px 20px rgba(99,102,241,0.4);">
+              <span id="mu-save-spinner" class="btn-spinner hidden"></span>
+              ✅ Onayla ve Kaydet
+            </button>
+          </div>
+
+          <div id="mu-save-alert" class="hidden" style="margin-top:16px;"></div>
+        </div>
+      </section>
     </main>
 
     <!-- Alt Bilgi -->

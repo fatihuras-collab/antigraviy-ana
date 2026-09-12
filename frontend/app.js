@@ -24,16 +24,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function switchTab(tabName) {
   const panels = {
-    consumption: 'panel-consumption',
-    feedback:    'panel-feedback',
-    menu:        'panel-menu',
-    manage:      'panel-manage'
+    consumption:  'panel-consumption',
+    feedback:     'panel-feedback',
+    menu:         'panel-menu',
+    manage:       'panel-manage',
+    menuupload:   'panel-menuupload'
   };
   const tabs = {
-    consumption: 'tab-consumption',
-    feedback:    'tab-feedback',
-    menu:        'tab-menu',
-    manage:      'tab-manage'
+    consumption:  'tab-consumption',
+    feedback:     'tab-feedback',
+    menu:         'tab-menu',
+    manage:       'tab-manage',
+    menuupload:   'tab-menuupload'
   };
 
   Object.values(panels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
@@ -1113,3 +1115,250 @@ async function saveAgeSetting() {
   }
 }
 
+// =============================================================================
+// AYLIK MENÜ YÜKLEME — menu upload panel logic
+// =============================================================================
+
+let muFile = null;
+
+// Sayfa yüklenince Ay seçiciyi bulunduğumuz aya getir
+(function muInitDefaults() {
+  const now = new Date();
+  const monthSel = document.getElementById('mu-month');
+  const yearInp  = document.getElementById('mu-year');
+  if (monthSel) monthSel.value = String(now.getMonth() + 1);
+  if (yearInp)  yearInp.value  = String(now.getFullYear());
+})();
+
+// ── Dropzone etkileşimleri ───────────────────────────────────────────────────
+(function muInitDropzone() {
+  const dropzone  = document.getElementById('mu-dropzone');
+  const fileInput = document.getElementById('mu-file-input');
+  if (!dropzone || !fileInput) return;
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files && fileInput.files[0]) {
+      muSetFile(fileInput.files[0]);
+    }
+  });
+
+  dropzone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropzone.classList.add('drag-over');
+  });
+
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      muSetFile(e.dataTransfer.files[0]);
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      fileInput.files = dt.files;
+    }
+  });
+})();
+
+function muSetFile(file) {
+  muFile = file;
+  const filename = document.getElementById('mu-filename');
+  if (filename) {
+    filename.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`;
+    filename.classList.remove('hidden');
+  }
+  const parseBtn = document.getElementById('mu-parse-btn');
+  if (parseBtn) parseBtn.disabled = false;
+  const alertEl = document.getElementById('mu-parse-alert');
+  if (alertEl) alertEl.classList.add('hidden');
+}
+
+// ── AI Menü Okuma ────────────────────────────────────────────────────────────
+async function menuParse() {
+  if (!muFile) return;
+
+  const month = document.getElementById('mu-month')?.value;
+  const year  = document.getElementById('mu-year')?.value;
+  if (!month || !year) return muShowParseError('Lütfen ay ve yıl seçin.');
+
+  const spinner  = document.getElementById('mu-parse-spinner');
+  const parseBtn = document.getElementById('mu-parse-btn');
+  const alertEl  = document.getElementById('mu-parse-alert');
+
+  parseBtn.disabled = true;
+  spinner.classList.remove('hidden');
+  alertEl.classList.add('hidden');
+  document.getElementById('mu-preview-section')?.classList.add('hidden');
+
+  try {
+    const formData = new FormData();
+    formData.append('file',  muFile);
+    formData.append('month', month);
+    formData.append('year',  year);
+
+    const resp = await fetch(`${API_BASE_URL}/api/menu/parse`, {
+      method: 'POST',
+      body:   formData
+    });
+
+    const data = await resp.json();
+    if (!data.success) return muShowParseError(data.error || 'Bilinmeyen bir hata oluştu.');
+
+    muRenderPreview(data.gunler);
+  } catch (err) {
+    muShowParseError(`Ağ hatası: ${err.message}`);
+  } finally {
+    parseBtn.disabled = false;
+    spinner.classList.add('hidden');
+  }
+}
+
+function muShowParseError(msg) {
+  const alertEl = document.getElementById('mu-parse-alert');
+  if (!alertEl) return;
+  alertEl.classList.remove('hidden');
+  alertEl.innerHTML = `<span style="font-size:1.1rem">⚠️</span><div><p class="alert-title">Hata</p><p class="alert-message">${msg}</p></div>`;
+}
+
+// ── Önizleme Tablosunu Doldur ────────────────────────────────────────────────
+function muRenderPreview(gunler) {
+  const tbody   = document.getElementById('mu-preview-tbody');
+  const section = document.getElementById('mu-preview-section');
+  const counter = document.getElementById('mu-gun-count');
+  if (!tbody || !section) return;
+
+  tbody.innerHTML = '';
+
+  gunler.forEach((gun) => {
+    const tr = document.createElement('tr');
+
+    const tdDate = document.createElement('td');
+    tdDate.className = 'mu-date-cell';
+    tdDate.textContent = gun.tarih;
+    tr.appendChild(tdDate);
+
+    const tdDay = document.createElement('td');
+    tdDay.className = 'mu-day-cell';
+    tdDay.textContent = gun.gun_adi || '';
+    tr.appendChild(tdDay);
+
+    ['kahvalti', 'ogle', 'ikindi'].forEach(tip => {
+      const td = document.createElement('td');
+      const ta = document.createElement('textarea');
+      ta.className = 'mu-editable';
+      ta.dataset.tip = tip;
+      ta.value = (gun[tip] || []).join('\n');
+      ta.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = this.scrollHeight + 'px';
+      });
+      setTimeout(() => {
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+      }, 0);
+      td.appendChild(ta);
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  if (counter) counter.textContent = `${gunler.length} gün`;
+  section.classList.remove('hidden');
+
+  const saveAlert = document.getElementById('mu-save-alert');
+  if (saveAlert) { saveAlert.classList.add('hidden'); saveAlert.innerHTML = ''; }
+}
+
+// ── Temizle ──────────────────────────────────────────────────────────────────
+function menuResetPreview() {
+  document.getElementById('mu-preview-section')?.classList.add('hidden');
+  const tbody = document.getElementById('mu-preview-tbody');
+  if (tbody) tbody.innerHTML = '';
+  muFile = null;
+  const fileInput = document.getElementById('mu-file-input');
+  if (fileInput) fileInput.value = '';
+  const filename = document.getElementById('mu-filename');
+  if (filename) { filename.textContent = ''; filename.classList.add('hidden'); }
+  const parseBtn = document.getElementById('mu-parse-btn');
+  if (parseBtn) parseBtn.disabled = true;
+  document.getElementById('mu-parse-alert')?.classList.add('hidden');
+  document.getElementById('mu-save-alert')?.classList.add('hidden');
+}
+
+// ── Tablodan Günleri Topla ───────────────────────────────────────────────────
+function muCollectGunler() {
+  const rows = document.querySelectorAll('#mu-preview-tbody tr');
+  const gunler = [];
+  rows.forEach(tr => {
+    const tarih  = tr.querySelector('.mu-date-cell')?.textContent?.trim();
+    const gunAdi = tr.querySelector('.mu-day-cell')?.textContent?.trim();
+    if (!tarih) return;
+    const result = { tarih, gun_adi: gunAdi };
+    tr.querySelectorAll('textarea.mu-editable').forEach(ta => {
+      result[ta.dataset.tip] = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
+    });
+    gunler.push(result);
+  });
+  return gunler;
+}
+
+// ── Onayla ve Kaydet ─────────────────────────────────────────────────────────
+async function menuSave() {
+  const gunler = muCollectGunler();
+  if (gunler.length === 0) return;
+
+  const saveBtn     = document.getElementById('mu-save-btn');
+  const saveSpinner = document.getElementById('mu-save-spinner');
+  const saveAlert   = document.getElementById('mu-save-alert');
+
+  saveBtn.disabled = true;
+  saveSpinner.classList.remove('hidden');
+  saveAlert.classList.add('hidden');
+  saveAlert.innerHTML = '';
+
+  try {
+    const resp = await fetch(`${API_BASE_URL}/api/menu/save`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ gunler })
+    });
+    const data = await resp.json();
+
+    if (!data.success) {
+      saveAlert.classList.remove('hidden');
+      saveAlert.className = 'alert alert-error';
+      saveAlert.innerHTML = `<span>❌</span><div><p class="alert-title">Kaydetme hatası</p><p class="alert-message">${data.error}</p></div>`;
+      return;
+    }
+
+    const recetesizler = data.recetesiz_yemekler || [];
+    let html = `<div class="mu-success-box">
+      <div>✅ <strong>${data.kaydedilen}</strong> menü satırı başarıyla kaydedildi.</div>`;
+
+    if (recetesizler.length > 0) {
+      html += `<div class="mu-warn-section">
+        <div class="mu-warn-section-title">⚠️ Şu yemeklerin reçetesi henüz tanımlanmamış (taslak olarak oluşturuldu):</div>
+        <ul class="mu-warn-list">
+          ${recetesizler.map(y => `<li>${y}</li>`).join('')}
+        </ul>
+        <p style="margin-top:10px;font-size:0.83rem;color:#94a3b8;">"Ürünler &amp; Reçeteler" sekmesinden malzeme ekleyebilirsiniz.</p>
+      </div>`;
+    }
+    html += '</div>';
+
+    saveAlert.classList.remove('hidden');
+    saveAlert.className = '';
+    saveAlert.innerHTML = html;
+  } catch (err) {
+    saveAlert.classList.remove('hidden');
+    saveAlert.className = 'alert alert-error';
+    saveAlert.innerHTML = `<span>❌</span><div><p class="alert-title">Ağ hatası</p><p class="alert-message">${err.message}</p></div>`;
+  } finally {
+    saveBtn.disabled = false;
+    saveSpinner.classList.add('hidden');
+  }
+}
