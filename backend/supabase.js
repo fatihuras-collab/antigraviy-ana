@@ -18,6 +18,7 @@ const SUPABASE_URL = cleanEnv(process.env.SUPABASE_URL);
 const SUPABASE_SERVICE_ROLE_KEY = cleanEnv(
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
   process.env.SUPABASE_KEY ||
   process.env.SUPABASE_SECRET
 );
@@ -31,18 +32,19 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error(`   SUPABASE_URL: ${SUPABASE_URL ? '✓ Algılandı' : '✗ EKSİK'}`);
   console.error(`   SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY ? '✓ Algılandı' : '✗ EKSİK'}`);
   console.error(`   Algılanan ilgili değişkenler: [${detectedKeys.join(', ')}]`);
-  console.error('   Lütfen Railway Variables sekmesinde SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY tanımlandığından emin olun.\n');
+  console.error('   Lütfen Railway Variables sekmesinde SUPABASE_URL ve SUPABASE_SERVICE_ROLE_KEY tanimlandigından emin olun.\n');
 
-  throw new Error('Supabase ortam değişkenleri eksik! Lütfen Railway Variables sekmesini kontrol edin.');
+  // throw yerine null export — sunucu ayağa kalksın, route'lar hata dönsün
+  module.exports = null;
+} else {
+  // service_role key: RLS'i bypass eder — sadece backend'de kullan!
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+
+  console.log('✅ Supabase bağlantısı başarıyla kuruldu.');
+  module.exports = supabase;
 }
-
-// service_role key: RLS'i bypass eder — sadece backend'de kullan!
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: {
-    persistSession: false,
-    autoRefreshToken: false
-  }
-});
-
-module.exports = supabase;
-
