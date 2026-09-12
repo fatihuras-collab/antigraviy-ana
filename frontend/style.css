@@ -108,13 +108,10 @@ body {
 .logo-icon {
   width: 46px;
   height: 46px;
-  background: linear-gradient(135deg, #10b981 0%, #0284c7 100%);
-  color: #fff;
-  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+  flex-shrink: 0;
 }
 
 .header-title {
