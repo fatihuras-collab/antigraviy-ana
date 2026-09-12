@@ -279,17 +279,23 @@ router.post('/save', async (req, res) => {
       return null;
     }
 
+    // Mevcut en büyük ID'yi bul (Postgres sequence çakışmasını önlemek için)
+    let currentMaxId = (tumReceteler || []).reduce((max, r) => (r.id > max ? r.id : max), 0);
+
     // Yemek adı → recipe_id çözücü (yoksa oluşturur)
     const yeniOlusturulanlar = [];
     async function receteIdGetirVeyaOlustur(ad, mealType) {
       let rid = receteIdBul(ad, mealType);
       if (rid) return rid;
 
-      // Yoksa oluştur (is_draft kolonu yoksa hatayı yakalayıp is_draft'sız dene)
+      currentMaxId += 1;
+      const nextId = currentMaxId;
+
+      // Yoksa oluştur (sequence çakışmasını önlemek için explicit nextId ile)
       let yeni;
       const { data: yData, error: yErr } = await supabase
         .from('recipes')
-        .insert([{ meal_name: ad.trim(), meal_type: mealType, is_draft: true }])
+        .insert([{ id: nextId, meal_name: ad.trim(), meal_type: mealType, is_draft: true }])
         .select('id')
         .single();
 
@@ -297,7 +303,7 @@ router.post('/save', async (req, res) => {
         // is_draft kolonu şemada yoksa is_draft'sız oluştur
         const { data: retryData, error: retryErr } = await supabase
           .from('recipes')
-          .insert([{ meal_name: ad.trim(), meal_type: mealType }])
+          .insert([{ id: nextId, meal_name: ad.trim(), meal_type: mealType }])
           .select('id')
           .single();
 

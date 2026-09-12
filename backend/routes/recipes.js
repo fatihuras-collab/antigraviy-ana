@@ -157,13 +157,33 @@ router.post('/', async (req, res) => {
     // is_draft: sadece alan tabloda mevcutsa anlamlı (migrasyon sonrası)
     if (typeof is_draft === 'boolean') insertPayload.is_draft = is_draft;
 
-    const { data: recipe, error: rErr } = await supabase
+    let recipe;
+    const { data: rData, error: rErr } = await supabase
       .from('recipes')
       .insert([insertPayload])
       .select()
       .single();
 
-    if (rErr) throw rErr;
+    if (rErr && rErr.code === '23505') {
+      // Sequence senkronize değilse max ID + 1 ile ekle
+      const { data: maxRows } = await supabase
+        .from('recipes')
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1);
+      const nextId = (maxRows?.[0]?.id || 0) + 1;
+      const { data: retryData, error: retryErr } = await supabase
+        .from('recipes')
+        .insert([{ ...insertPayload, id: nextId }])
+        .select()
+        .single();
+      if (retryErr) throw retryErr;
+      recipe = retryData;
+    } else if (rErr) {
+      throw rErr;
+    } else {
+      recipe = rData;
+    }
 
     // 2. İçerikleri toplu ekle
     const ingRows = ingredients.map(ing => ({
