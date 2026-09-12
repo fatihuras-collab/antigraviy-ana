@@ -17,7 +17,8 @@ const VALID_MEAL_TYPES = ['kahvalti', 'ogle', 'ikindi'];
 // ─── GET /api/recipes ─────────────────────────────────────────────────────────
 router.get('/', async (req, res) => {
   try {
-    const { data: recipes, error: rErr } = await supabase
+    let recipes;
+    const { data: rData, error: rErr } = await supabase
       .from('recipes')
       .select(`
         id,
@@ -38,7 +39,33 @@ router.get('/', async (req, res) => {
       .order('meal_type')
       .order('meal_name');
 
-    if (rErr) throw rErr;
+    if (rErr) {
+      // is_draft kolonu yoksa is_draft'sız çek
+      const { data: fallbackData, error: fbErr } = await supabase
+        .from('recipes')
+        .select(`
+          id,
+          meal_name,
+          meal_type,
+          created_at,
+          recipe_ingredients (
+            id,
+            quantity_per_portion,
+            products (
+              id,
+              name,
+              unit
+            )
+          )
+        `)
+        .order('meal_type')
+        .order('meal_name');
+
+      if (fbErr) throw fbErr;
+      recipes = fallbackData;
+    } else {
+      recipes = rData;
+    }
 
     const formatted = (recipes || []).map(r => ({
       id:         r.id,

@@ -285,13 +285,27 @@ router.post('/save', async (req, res) => {
       let rid = receteIdBul(ad, mealType);
       if (rid) return rid;
 
-      // Yoksa is_draft=true ile oluştur
-      const { data: yeni, error: yErr } = await supabase
+      // Yoksa oluştur (is_draft kolonu yoksa hatayı yakalayıp is_draft'sız dene)
+      let yeni;
+      const { data: yData, error: yErr } = await supabase
         .from('recipes')
         .insert([{ meal_name: ad.trim(), meal_type: mealType, is_draft: true }])
         .select('id')
         .single();
-      if (yErr) throw yErr;
+
+      if (yErr) {
+        // is_draft kolonu şemada yoksa is_draft'sız oluştur
+        const { data: retryData, error: retryErr } = await supabase
+          .from('recipes')
+          .insert([{ meal_name: ad.trim(), meal_type: mealType }])
+          .select('id')
+          .single();
+
+        if (retryErr) throw retryErr;
+        yeni = retryData;
+      } else {
+        yeni = yData;
+      }
 
       rid = yeni.id;
       receteMap[`${ad.trim()}::${mealType}`] = rid;
