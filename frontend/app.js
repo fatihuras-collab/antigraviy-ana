@@ -777,6 +777,9 @@ async function deleteProduct(id, name) {
 
 // ── REÇETELER ────────────────────────────────────────────────────────────────
 
+let _cachedRecipes = [];
+let _editingRecipeId = null;
+
 async function loadRecipes() {
   const loadingEl = document.getElementById('recipes-loading');
   const areaEl    = document.getElementById('recipes-cards-area');
@@ -789,6 +792,7 @@ async function loadRecipes() {
     const res  = await fetch(`${API_BASE_URL}/api/recipes`);
     const data = await res.json();
     const list = data.data || [];
+    _cachedRecipes = list;
 
     areaEl.innerHTML = '';
 
@@ -808,9 +812,10 @@ async function loadRecipes() {
 
       const icon  = MEAL_ICONS[recipe.meal_type] || '🍽️';
       const label = MEAL_LABELS[recipe.meal_type] || recipe.meal_type;
+      const isDraftOrEmpty = recipe.is_draft || (recipe.ingredients || []).length === 0;
 
       // Taslak kart görsel sönümlemesi
-      if (recipe.is_draft) card.style.opacity = '0.72';
+      if (recipe.is_draft) card.style.opacity = '0.85';
 
       // Taslak rozeti
       const draftBadge = recipe.is_draft
@@ -823,10 +828,19 @@ async function loadRecipes() {
             <span class="meal-type-pill pill-${recipe.meal_type}" style="font-size:0.7rem">${icon} ${label}</span>
             <div>
               <div class="recipe-list-name">${escapeHtml(recipe.meal_name)} ${draftBadge}</div>
-              <div class="recipe-list-meta">${(recipe.ingredients||[]).length} malzeme${recipe.is_draft ? ' • Menüye eklenmedi' : ''}</div>
+              <div class="recipe-list-meta">${(recipe.ingredients||[]).length} malzeme${recipe.is_draft ? ' • Menüye eklendi, malzeme bekliyor' : ''}</div>
             </div>
           </div>
           <div class="recipe-list-right">
+            <button class="btn-edit-recipe ${isDraftOrEmpty ? 'btn-fill-draft' : ''}" 
+                    title="${isDraftOrEmpty ? 'Malzemeleri Doldur ve Yayına Al' : 'Reçeteyi Düzenle'}" 
+                    onclick="event.stopPropagation(); editRecipe(${recipe.id})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              <span>${isDraftOrEmpty ? 'Malzeme Ekle' : 'Düzenle'}</span>
+            </button>
             <button class="btn-delete" title="Reçeteyi Sil" onclick="event.stopPropagation(); deleteRecipe(${recipe.id}, '${escapeHtml(recipe.meal_name)}')">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -841,7 +855,14 @@ async function loadRecipes() {
           </div>
         </div>
         <div class="recipe-list-body">
-          <div class="recipe-ing-chips">${ingChips || '<span style="color:var(--text-muted);font-size:0.82rem">Malzeme yok</span>'}</div>
+          <div class="recipe-ing-chips">
+            ${ingChips || `
+              <div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
+                <span style="color:var(--text-muted);font-size:0.82rem">Bu reçeteye henüz malzeme eklenmemiş.</span>
+                <button class="btn-edit-recipe btn-fill-draft" onclick="editRecipe(${recipe.id})">✏️ Şimdi Malzeme Tanımla</button>
+              </div>
+            `}
+          </div>
         </div>
       `;
       areaEl.appendChild(card);
@@ -862,20 +883,84 @@ function toggleRecipeCard(cardId) {
 function toggleRecipeForm() {
   const form = document.getElementById('recipe-form-container');
   const btn  = document.getElementById('recipe-form-toggle-btn');
+  const titleEl = form?.querySelector('.manage-form-title');
+  const saveBtn = document.getElementById('recipe-save-btn');
+
   const isHidden = form?.classList.toggle('hidden');
   if (btn) btn.textContent = isHidden ? '+ Yeni Reçete Ekle' : '✕ Kapat';
-  if (!isHidden) {
-    // İlk satırı otomatik ekle
+
+  if (isHidden) {
+    _editingRecipeId = null;
+  } else {
+    // Yeni reçete moduna sıfırla
+    _editingRecipeId = null;
+    if (titleEl) titleEl.textContent = 'Yeni Reçete';
+    if (saveBtn) saveBtn.innerHTML = '<span id="recipe-save-spinner" class="btn-spinner hidden"></span>Reçeteyi Kaydet';
+    document.getElementById('rf-name').value = '';
+    document.getElementById('rf-mealtype').value = 'ogle';
+    document.getElementById('rf-is-draft').checked = false;
     const list = document.getElementById('recipe-ingredients-list');
-    if (list && list.children.length === 0) addIngredientRow();
+    if (list) list.innerHTML = '';
+    _ingRowCounter = 0;
+    addIngredientRow();
     document.getElementById('rf-name')?.focus();
     document.getElementById('recipe-form-alert')?.classList.add('hidden');
   }
 }
 
+function editRecipe(recipeId) {
+  const recipe = _cachedRecipes.find(r => r.id === recipeId);
+  if (!recipe) return;
+
+  _editingRecipeId = recipeId;
+
+  const formBox     = document.getElementById('recipe-form-container');
+  const toggleBtn   = document.getElementById('recipe-form-toggle-btn');
+  const titleEl     = formBox?.querySelector('.manage-form-title');
+  const saveBtn     = document.getElementById('recipe-save-btn');
+  const alertEl     = document.getElementById('recipe-form-alert');
+
+  // Formu aç
+  formBox?.classList.remove('hidden');
+  if (toggleBtn) toggleBtn.textContent = '✕ İptal';
+  if (titleEl) titleEl.textContent = `Reçeteyi Düzenle: ${recipe.meal_name}`;
+  if (saveBtn) saveBtn.innerHTML = '<span id="recipe-save-spinner" class="btn-spinner hidden"></span>Değişiklikleri Kaydet';
+
+  // Alanları doldur
+  const nameInput     = document.getElementById('rf-name');
+  const mealTypeInput = document.getElementById('rf-mealtype');
+  const draftCheckbox = document.getElementById('rf-is-draft');
+
+  if (nameInput) nameInput.value = recipe.meal_name;
+  if (mealTypeInput) mealTypeInput.value = recipe.meal_type || 'ogle';
+  // Taslaksa, malzeme girildiğinde otomatik yayına çıksın diye varsayılan olarak unchecked yapıyoruz (kullanıcı isterse tekrar işaretleyebilir)
+  if (draftCheckbox) draftCheckbox.checked = false;
+
+  // İçerik satırlarını doldur
+  const list = document.getElementById('recipe-ingredients-list');
+  if (list) list.innerHTML = '';
+  _ingRowCounter = 0;
+
+  if (recipe.ingredients && recipe.ingredients.length > 0) {
+    recipe.ingredients.forEach(ing => {
+      addIngredientRow(ing.product_id, ing.quantity_per_portion);
+    });
+  } else {
+    // Malzeme yoksa kullanıcı doldursun diye 1 boş satır aç
+    addIngredientRow();
+  }
+
+  alertEl?.classList.add('hidden');
+
+  // Forma kaydır ve odaklan
+  formBox?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const firstQty = formBox?.querySelector('.ing-qty');
+  if (firstQty) firstQty.focus();
+}
+
 let _ingRowCounter = 0;
 
-function addIngredientRow() {
+function addIngredientRow(productId = '', quantity = '') {
   const list = document.getElementById('recipe-ingredients-list');
   if (!list) return;
 
@@ -884,8 +969,11 @@ function addIngredientRow() {
 
   // Ürün seçenekleri
   const productOptions = _cachedProducts.map(p =>
-    `<option value="${p.id}">${escapeHtml(p.name)} (${p.unit})</option>`
+    `<option value="${p.id}" ${p.id == productId ? 'selected' : ''}>${escapeHtml(p.name)} (${p.unit})</option>`
   ).join('');
+
+  const selectedProd = _cachedProducts.find(p => p.id == productId);
+  const unitText = selectedProd?.unit || 'birim';
 
   const row = document.createElement('div');
   row.className = 'ing-row';
@@ -895,8 +983,8 @@ function addIngredientRow() {
       <option value="">— Ürün seçin —</option>
       ${productOptions}
     </select>
-    <input type="number" class="mf-input ing-qty" placeholder="Miktar" min="0.0001" step="0.001" data-row="${rowId}">
-    <span class="mf-input" style="display:flex;align-items:center;font-size:0.78rem;color:var(--text-muted);padding:0 10px;" id="ing-unit-${rowId}">birim</span>
+    <input type="number" class="mf-input ing-qty" placeholder="Miktar" min="0.0001" step="0.001" value="${quantity || ''}" data-row="${rowId}">
+    <span class="mf-input" style="display:flex;align-items:center;font-size:0.78rem;color:var(--text-muted);padding:0 10px;" id="ing-unit-${rowId}">${unitText}</span>
     <button type="button" class="btn-remove-row" onclick="removeIngredientRow('${rowId}')" title="Kaldır">×</button>
   `;
 
@@ -962,9 +1050,13 @@ async function saveRecipe() {
   saveBtn.disabled = true;
   spinner?.classList.remove('hidden');
 
+  const isEditing = !!_editingRecipeId;
+  const url = isEditing ? `${API_BASE_URL}/api/recipes/${_editingRecipeId}` : `${API_BASE_URL}/api/recipes`;
+  const method = isEditing ? 'PUT' : 'POST';
+
   try {
-    const res  = await fetch(`${API_BASE_URL}/api/recipes`, {
-      method: 'POST',
+    const res  = await fetch(url, {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ meal_name: name, meal_type: mealType, is_draft: isDraft, ingredients })
     });
@@ -975,10 +1067,16 @@ async function saveRecipe() {
       return;
     }
 
-    showManageAlert(alertEl, `"${name}" reçetesi ${ingredients.length} malzemeyle eklendi!`, 'ok');
+    const successMsg = isEditing 
+      ? `"${name}" reçetesi ${ingredients.length} malzemeyle güncellendi ve yayına alındı!`
+      : `"${name}" reçetesi ${ingredients.length} malzemeyle eklendi!`;
+
+    showManageAlert(alertEl, successMsg, 'ok');
     document.getElementById('rf-name').value = '';
     document.getElementById('recipe-ingredients-list').innerHTML = '';
     _ingRowCounter = 0;
+    _editingRecipeId = null;
+
     await loadRecipes();
     setTimeout(() => toggleRecipeForm(), 1400);
   } catch (err) {

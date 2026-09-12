@@ -214,6 +214,89 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ─── PUT /api/recipes/:id ───────────────────────────────────────────────────
+// Body: { meal_name, meal_type, is_draft?, ingredients: [{product_id, quantity_per_portion}] }
+router.put('/:id', async (req, res) => {
+  const rid = parseInt(req.params.id, 10);
+  const { meal_name, meal_type, is_draft, ingredients } = req.body;
+
+  if (!rid) {
+    return res.status(400).json({ success: false, error: 'Geçersiz reçete ID.' });
+  }
+
+  if (!meal_name || !meal_name.trim()) {
+    return res.status(400).json({ success: false, error: 'meal_name zorunludur.' });
+  }
+
+  const mType = (meal_type || 'ogle').toLowerCase();
+  if (!VALID_MEAL_TYPES.includes(mType)) {
+    return res.status(400).json({
+      success: false,
+      error: `meal_type geçersiz. Şunlardan biri olmalı: ${VALID_MEAL_TYPES.join(', ')}`
+    });
+  }
+
+  try {
+    const updatePayload = { meal_name: meal_name.trim(), meal_type: mType };
+    if (typeof is_draft === 'boolean') {
+      updatePayload.is_draft = is_draft;
+    }
+
+    let recipe;
+    const { data: rData, error: rErr } = await supabase
+      .from('recipes')
+      .update(updatePayload)
+      .eq('id', rid)
+      .select()
+      .single();
+
+    if (rErr && rErr.message && rErr.message.includes('is_draft')) {
+      delete updatePayload.is_draft;
+      const { data: retryData, error: retryErr } = await supabase
+        .from('recipes')
+        .update(updatePayload)
+        .eq('id', rid)
+        .select()
+        .single();
+      if (retryErr) throw retryErr;
+      recipe = retryData;
+    } else if (rErr) {
+      throw rErr;
+    } else {
+      recipe = rData;
+    }
+
+    // Malzemeleri güncelle (mevcutları silip yenilerini ekle)
+    if (Array.isArray(ingredients)) {
+      await supabase.from('recipe_ingredients').delete().eq('recipe_id', rid);
+
+      if (ingredients.length > 0) {
+        const ingRows = ingredients.map(ing => ({
+          recipe_id:            rid,
+          product_id:           parseInt(ing.product_id, 10),
+          quantity_per_portion: parseFloat(ing.quantity_per_portion)
+        }));
+
+        const { error: ingErr } = await supabase
+          .from('recipe_ingredients')
+          .insert(ingRows);
+
+        if (ingErr) throw ingErr;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `"${meal_name}" reçetesi başarıyla güncellendi.`,
+      data: recipe
+    });
+
+  } catch (err) {
+    console.error('[PUT recipes HATA]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── DELETE /api/recipes/:id ──────────────────────────────────────────────────
 router.delete('/:id', async (req, res) => {
   try {
