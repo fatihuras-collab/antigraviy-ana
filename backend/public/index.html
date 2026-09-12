@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anaokulu Yemekhane Stok Takip Paneli</title>
+  <meta name="description" content="Anaokulu yemekhanesi için otomatik stok takip, günlük tüketim hesaplama ve öğün geri bildirim sistemi.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Arka plan efektleri -->
+  <div class="bg-glow bg-glow-1"></div>
+  <div class="bg-glow bg-glow-2"></div>
+  <div class="bg-glow bg-glow-3"></div>
+
+  <div class="app-container">
+    <!-- Üst Başlık Barı -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="logo-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8h1a4 4 0 0 1 0 8h-1"></path>
+            <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path>
+            <line x1="6" y1="1" x2="6" y2="4"></line>
+            <line x1="10" y1="1" x2="10" y2="4"></line>
+            <line x1="14" y1="1" x2="14" y2="4"></line>
+          </svg>
+        </div>
+        <div>
+          <h1 class="header-title">Anaokulu Yemekhane</h1>
+          <p class="header-subtitle">Otomatik Stok Takip &amp; Tüketim Sistemi</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="badge badge-success">
+          <span class="status-dot"></span>
+          <span>Sistem Çevrimiçi</span>
+        </div>
+        <div class="badge" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 9999px;">
+          <span class="setting-age-group">2-6 Yaş Grubu</span>
+        </div>
+        <div class="date-display" id="today-date-badge">—</div>
+      </div>
+    </header>
+
+    <!-- Tab Navigasyonu -->
+    <nav class="tab-nav" role="tablist">
+      <button id="tab-consumption" class="tab-btn tab-active" role="tab" aria-selected="true" onclick="switchTab('consumption')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        Tüketim Girişi
+      </button>
+      <button id="tab-feedback" class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('feedback')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+        Öğün Değerlendirmesi
+        <span class="tab-badge hidden" id="feedback-badge">!</span>
+      </button>
+      <button id="tab-menu" class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('menu')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        Aylık Yemek Listesi
+      </button>
+      <button id="tab-manage" class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('manage')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="8" y1="6" x2="21" y2="6"></line>
+          <line x1="8" y1="12" x2="21" y2="12"></line>
+          <line x1="8" y1="18" x2="21" y2="18"></line>
+          <line x1="3" y1="6" x2="3.01" y2="6"></line>
+          <line x1="3" y1="12" x2="3.01" y2="12"></line>
+          <line x1="3" y1="18" x2="3.01" y2="18"></line>
+        </svg>
+        Ürünler &amp; Reçeteler
+      </button>
+    </nav>
+
+    <!-- ════ PANEL 1: TÜKETİM GİRİŞİ ════ -->
+    <main id="panel-consumption" class="main-content">
+      <section class="card input-card">
+        <div class="card-header">
+          <div class="card-icon-bubble">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          </div>
+          <div>
+            <h2 class="card-title">Günlük Pişirim &amp; Tüketim Girişi</h2>
+            <p class="card-description">Bugün yemekhaneden yemek yiyecek öğrenci sayısını girin. Sistem bugünün menüsüne göre reçetedeki tüm malzemeleri hesaplayıp stoktan otomatik düşer.</p>
+          </div>
+        </div>
+
+        <form id="consumption-form" class="consumption-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="portion-input" class="form-label">Bugün kaç öğrenci var?</label>
+            <div class="input-wrapper">
+              <div class="input-prefix-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+              </div>
+              <input 
+                type="number" 
+                id="portion-input" 
+                name="portion_count" 
+                class="form-input" 
+                min="1" 
+                max="500" 
+                value="70" 
+                placeholder="Örn: 70"
+                required
+              />
+              <span class="input-suffix">Öğrenci</span>
+            </div>
+
+            <!-- Hızlı seçim butonları -->
+            <div class="quick-chips">
+              <span class="quick-chip-label">Hızlı Seç:</span>
+              <button type="button" class="chip-btn" data-val="60">60</button>
+              <button type="button" class="chip-btn active" data-val="70">70</button>
+              <button type="button" class="chip-btn" data-val="75">75</button>
+              <button type="button" class="chip-btn" data-val="80">80</button>
+              <button type="button" class="chip-btn" data-val="90">90</button>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="apply-btn" class="btn btn-primary">
+              <span class="btn-spinner hidden" id="btn-spinner"></span>
+              <svg class="btn-icon" id="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span id="btn-text">Uygula ve Stoktan Düş</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Bildirim / Hata Alanı -->
+      <div id="alert-box" class="alert hidden">
+        <div class="alert-icon" id="alert-icon"></div>
+        <div class="alert-content">
+          <h4 class="alert-title" id="alert-title"></h4>
+          <p class="alert-message" id="alert-message"></p>
+        </div>
+      </div>
+
+      <!-- Sonuç Ekranı -->
+      <section id="result-section" class="card result-card hidden">
+        <div class="result-header">
+          <div class="recipe-badge-group">
+            <span class="result-tag">BUGÜNÜN MENÜSÜ</span>
+            <h3 class="recipe-title" id="res-recipe-name">Günlük 3 Öğün</h3>
+            <p class="result-meta" id="res-meta-info">70 Porsiyon</p>
+          </div>
+          <div class="result-status-pill">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span>Stoktan Düşüldü</span>
+          </div>
+        </div>
+
+        <!-- Özet Sayaç Kutuları -->
+        <div class="stat-grid">
+          <div class="stat-box">
+            <span class="stat-label">Toplam Malzeme</span>
+            <span class="stat-value" id="stat-ingredients-count">0 Çeşit</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">Öğrenci Sayısı</span>
+            <span class="stat-value" id="stat-portion-count">0 Kişi</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-label">İşlenen Öğün Sayısı</span>
+            <span class="stat-value text-success" id="stat-meals-count">3 Öğün</span>
+          </div>
+        </div>
+
+        <!-- 3 Öğün Kartları -->
+        <div class="meals-grid" id="meals-cards-container">
+          <!-- JS ile doldurulur -->
+        </div>
+
+        <div class="section-heading-row">
+          <h4 class="section-subtitle">Günlük Konsolide Malzeme ve Stok Durumu</h4>
+          <span class="section-subtext">3 öğünün toplam malzeme tüketimi ve depoda kalan net stok</span>
+        </div>
+
+        <!-- Malzeme ve Düşüm Tablosu -->
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Ürün / Malzeme</th>
+                <th class="text-right">Toplam Düşülen</th>
+                <th class="text-right">Önceki Stok</th>
+                <th class="text-right">Kalan Stok</th>
+                <th class="text-center">Durum</th>
+              </tr>
+            </thead>
+            <tbody id="consumption-table-body">
+              <!-- JS ile dinamik doldurulur -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- ════ PANEL 2: GERİ BİLDİRİM ════ -->
+    <main id="panel-feedback" class="main-content hidden">
+      <!-- Başlık Kartı -->
+      <section class="card feedback-header-card">
+        <div class="card-header" style="margin-bottom: 0;">
+          <div class="card-icon-bubble card-icon-purple">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+          </div>
+          <div style="flex: 1;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+              <div>
+                <h2 class="card-title">Öğün Değerlendirmesi</h2>
+                <p class="card-description">1 Aylık menüdeki herhangi bir haftayı ve günü seçerek çocukların tepkilerini kaydedin.</p>
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="switchTab('menu')" style="padding: 6px 14px; font-size: 13px;">
+                📋 Tüm Aylık Listeyi Gör
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hafta ve Gün Seçim Barı -->
+        <div class="menu-filter-bar">
+          <div class="filter-group">
+            <span class="filter-label">Hafta:</span>
+            <div class="filter-pills" id="fb-week-pills">
+              <button type="button" class="pill-btn active" data-week="1" onclick="selectFeedbackWeek(1)">1. Hafta</button>
+              <button type="button" class="pill-btn" data-week="2" onclick="selectFeedbackWeek(2)">2. Hafta</button>
+              <button type="button" class="pill-btn" data-week="3" onclick="selectFeedbackWeek(3)">3. Hafta</button>
+              <button type="button" class="pill-btn" data-week="4" onclick="selectFeedbackWeek(4)">4. Hafta</button>
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <span class="filter-label">Gün:</span>
+            <div class="filter-pills" id="fb-day-pills">
+              <button type="button" class="pill-btn active" data-day="1" onclick="selectFeedbackDay(1)">Pazartesi</button>
+              <button type="button" class="pill-btn" data-day="2" onclick="selectFeedbackDay(2)">Salı</button>
+              <button type="button" class="pill-btn" data-day="3" onclick="selectFeedbackDay(3)">Çarşamba</button>
+              <button type="button" class="pill-btn" data-day="4" onclick="selectFeedbackDay(4)">Perşembe</button>
+              <button type="button" class="pill-btn" data-day="5" onclick="selectFeedbackDay(5)">Cuma</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aktif Gün Bilgi Rozeti -->
+        <div class="active-day-banner" id="active-day-banner">
+          <span class="banner-icon">🗓️</span>
+          <span id="active-day-text">1. Hafta • Pazartesi Menüsü (<span class="setting-age-group">2-6 Yaş Grubu</span>)</span>
+        </div>
+      </section>
+
+      <!-- Yükleniyor göstergesi -->
+      <div id="feedback-loading" class="feedback-loading-state">
+        <div class="loading-spinner-lg"></div>
+        <p>Seçilen günün menüsü yükleniyor…</p>
+      </div>
+
+      <!-- Boş durum -->
+      <div id="feedback-empty" class="feedback-empty-state hidden">
+        <div class="empty-icon">🍽️</div>
+        <h3>Bu gün için menü bulunamadı</h3>
+        <p>Hafta veya gün seçimini değiştirip tekrar deneyin.</p>
+      </div>
+
+      <!-- 3 Öğün Geri Bildirim Kartları -->
+      <div id="feedback-cards-grid" class="feedback-grid hidden">
+        <!-- JS ile doldurulur -->
+      </div>
+
+      <!-- Kaydetme bildirimi (toast) -->
+      <div id="feedback-toast" class="feedback-toast hidden">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span id="feedback-toast-text">Geri bildirim kaydedildi</span>
+      </div>
+    </main>
+
+    <!-- ════ PANEL: AYLIK YEMEK LİSTESİ ════ -->
+    <main id="panel-menu" class="main-content hidden">
+      <section class="card">
+        <div class="card-header" style="margin-bottom: 16px;">
+          <div class="card-icon-bubble card-icon-green">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </div>
+          <div>
+            <h2 class="card-title">Anaokulu | Bir Aylık Yemek Listesi</h2>
+            <p class="card-description"><span class="setting-age-group">2-6 yaş grubu</span> • 20 okul günü • Kahvaltı, öğle yemeği ve ikindi ara öğünü</p>
+          </div>
+        </div>
+
+        <!-- Hafta Sekmeleri (1. Hafta, 2. Hafta, 3. Hafta, 4. Hafta) -->
+        <div class="menu-tabs-row" id="monthly-week-tabs">
+          <button type="button" class="menu-tab-btn active" data-w="1" onclick="showMonthlyWeek(1)">1. HAFTA</button>
+          <button type="button" class="menu-tab-btn" data-w="2" onclick="showMonthlyWeek(2)">2. HAFTA</button>
+          <button type="button" class="menu-tab-btn" data-w="3" onclick="showMonthlyWeek(3)">3. HAFTA</button>
+          <button type="button" class="menu-tab-btn" data-w="4" onclick="showMonthlyWeek(4)">4. HAFTA</button>
+        </div>
+
+        <!-- Hafta Tablosu Konteyneri -->
+        <div class="table-container" style="margin-top: 16px;">
+          <table class="data-table menu-full-table">
+            <thead>
+              <tr>
+                <th style="width: 110px;">Gün</th>
+                <th>🌅 Kahvaltı</th>
+                <th>🍲 Öğle Yemeği</th>
+                <th>🍪 İkindi Ara Öğünü</th>
+                <th style="width: 120px; text-align: center;">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="monthly-table-body">
+              <!-- JS ile dinamik doldurulur -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Uygulama Notları -->
+        <div class="menu-notes-box">
+          <div class="menu-notes-title">📌 Uygulama Notları</div>
+          <p>• <strong>Meyve ve sebzeler</strong> mevsime göre değiştirilebilir. Su her öğünde ve gün boyunca sunulmalıdır.</p>
+          <p>• <strong>Balık</strong> tamamen kılçıksız, meyve ve sebzeler yaşa uygun büyüklükte hazırlanmalıdır.</p>
+          <p>• Bu liste örnek taslaktır. Porsiyonlar ve alerjilere yönelik değişiklikler, çocukların ihtiyaçlarına göre okulun diyetisyeniyle netleştirilmelidir.</p>
+        </div>
+      </section>
+    </main>
+
+    <!-- ════ PANEL 3: YÖNETİM ════ -->
+    <main id="panel-manage" class="main-content hidden">
+
+      <!-- ── Okul & Sistem Ayarları ── -->
+      <section class="manage-section" style="margin-bottom: 24px;">
+        <div class="manage-section-header">
+          <div>
+            <h2 class="manage-section-title">
+              <span class="manage-section-icon">⚙️</span> Okul &amp; Sistem Ayarları
+            </h2>
+            <p class="manage-section-desc">Yemekhane hedef yaş grubu ve okul ayarlarını buradan özelleştirebilirsiniz</p>
+          </div>
+        </div>
+
+        <div class="manage-form-box" style="margin-top: 12px; background: rgba(15, 23, 42, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); padding: 18px 20px; border-radius: var(--radius-md);">
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+            <div class="mf-group" style="flex: 1; min-width: 240px; margin-bottom: 0;">
+              <label class="mf-label" for="setting-age-input">Hedef Öğrenci Yaş Grubu *</label>
+              <input type="text" id="setting-age-input" class="mf-input" value="2-6 Yaş Grubu" placeholder="Örn: 2-6 Yaş Grubu">
+            </div>
+            
+            <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 2px;">
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Hızlı Seç:</span>
+              <button type="button" class="chip-btn" onclick="setAgePreset('2-6 Yaş Grubu')">2-6 Yaş</button>
+              <button type="button" class="chip-btn" onclick="setAgePreset('3-6 Yaş Grubu')">3-6 Yaş</button>
+              <button type="button" class="chip-btn" onclick="setAgePreset('4-6 Yaş Grubu')">4-6 Yaş</button>
+            </div>
+
+            <button type="button" class="btn btn-primary" onclick="saveAgeSetting()" id="save-setting-btn" style="padding: 10px 20px;">
+              💾 Ayarı Kaydet
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Ürünler Bölümü ── -->
+      <section class="manage-section">
+        <div class="manage-section-header">
+          <div>
+            <h2 class="manage-section-title">
+              <span class="manage-section-icon">📦</span> Ürünler
+            </h2>
+            <p class="manage-section-desc">Stok takibindeki tüm malzemeler</p>
+          </div>
+          <button class="btn btn-outline-sm" onclick="toggleProductForm()" id="product-form-toggle-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Yeni Ürün Ekle
+          </button>
+        </div>
+
+        <!-- Ürün Ekleme Formu (gizli/açık) -->
+        <div id="product-form-container" class="manage-form-box hidden">
+          <h3 class="manage-form-title">Yeni Ürün</h3>
+          <div class="manage-form-grid">
+            <div class="mf-group">
+              <label class="mf-label">Ürün Adı *</label>
+              <input type="text" id="pf-name" class="mf-input" placeholder="örn: Ispanak">
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">Birim *</label>
+              <select id="pf-unit" class="mf-input mf-select">
+                <option value="kg">kg</option>
+                <option value="g">g</option>
+                <option value="L">L</option>
+                <option value="ml">ml</option>
+                <option value="adet">adet</option>
+                <option value="demet">demet</option>
+                <option value="kutu">kutu</option>
+                <option value="paket">paket</option>
+              </select>
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">Kategori</label>
+              <select id="pf-category" class="mf-input mf-select">
+                <option value="">— Seçin —</option>
+                <option value="sebze">Sebze</option>
+                <option value="meyve">Meyve</option>
+                <option value="et">Et / Tavuk</option>
+                <option value="sut_urunleri">Süt Ürünleri</option>
+                <option value="bakliyat">Bakliyat</option>
+                <option value="tahıl">Tahıl / Makarna</option>
+                <option value="yag">Yağ / Baharat</option>
+                <option value="diger">Diğer</option>
+              </select>
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">Kritik Eşik</label>
+              <input type="number" id="pf-threshold" class="mf-input" placeholder="örn: 2" min="0" step="0.1">
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">Protein (g/birim)</label>
+              <input type="number" id="pf-protein" class="mf-input" placeholder="örn: 2.8" min="0" step="0.001">
+            </div>
+          </div>
+          <div class="manage-form-actions">
+            <button class="btn btn-outline-sm" onclick="toggleProductForm()">İptal</button>
+            <button class="btn btn-teal" id="product-save-btn" onclick="saveProduct()">
+              <span id="product-save-spinner" class="btn-spinner hidden"></span>
+              Kaydet
+            </button>
+          </div>
+          <div id="product-form-alert" class="manage-alert hidden"></div>
+        </div>
+
+        <!-- Ürün Listesi -->
+        <div id="products-list-container">
+          <div class="manage-loading" id="products-loading">
+            <div class="loading-spinner-lg"></div><p>Ürünler yükleniyor…</p>
+          </div>
+          <div class="manage-table-wrapper hidden" id="products-table-wrapper">
+            <table class="manage-table">
+              <thead>
+                <tr>
+                  <th>Ürün Adı</th>
+                  <th>Birim</th>
+                  <th>Kategori</th>
+                  <th class="text-right">Kritik Eşik</th>
+                  <th class="text-right">Protein</th>
+                  <th class="text-center">İşlem</th>
+                </tr>
+              </thead>
+              <tbody id="products-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ayırıcı -->
+      <div class="manage-divider"></div>
+
+      <!-- ── Reçeteler Bölümü ── -->
+      <section class="manage-section">
+        <div class="manage-section-header">
+          <div>
+            <h2 class="manage-section-title">
+              <span class="manage-section-icon">📋</span> Reçeteler
+            </h2>
+            <p class="manage-section-desc">Kayıtlı yemek reçeteleri ve içerikleri</p>
+          </div>
+          <button class="btn btn-outline-sm" onclick="toggleRecipeForm()" id="recipe-form-toggle-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Yeni Reçete Ekle
+          </button>
+        </div>
+
+        <!-- Reçete Ekleme Formu -->
+        <div id="recipe-form-container" class="manage-form-box hidden">
+          <h3 class="manage-form-title">Yeni Reçete</h3>
+          <div class="manage-form-grid" style="grid-template-columns: 1fr 1fr;">
+            <div class="mf-group">
+              <label class="mf-label">Yemek Adı *</label>
+              <input type="text" id="rf-name" class="mf-input" placeholder="örn: Ispanak Yemeği">
+            </div>
+            <div class="mf-group">
+              <label class="mf-label">Öğün Türü *</label>
+              <select id="rf-mealtype" class="mf-input mf-select">
+                <option value="kahvalti">🌅 Kahvaltı</option>
+                <option value="ogle" selected>🍲 Öğle Yemeği</option>
+                <option value="ikindi">🍪 İkindi Kahvaltısı</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Dinamik İçerik Satırları -->
+          <div class="recipe-ingredients-header">
+            <span class="mf-label" style="margin-bottom:0">Malzemeler *</span>
+            <button type="button" class="btn-add-row" onclick="addIngredientRow()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              Satır Ekle
+            </button>
+          </div>
+          <div id="recipe-ingredients-list" class="recipe-ingredients-list">
+            <!-- Satırlar JS ile eklenir -->
+          </div>
+
+          <!-- Taslak seçeneği -->
+          <label class="draft-checkbox-label">
+            <input type="checkbox" id="rf-is-draft">
+            <span class="draft-checkbox-icon">📝</span>
+            <span>Taslak olarak kaydet</span>
+            <span class="draft-checkbox-hint">(henüz menüye almaya hazır değil)</span>
+          </label>
+
+          <div class="manage-form-actions" style="margin-top:20px;">
+            <button class="btn btn-outline-sm" onclick="toggleRecipeForm()">İptal</button>
+            <button class="btn btn-purple" id="recipe-save-btn" onclick="saveRecipe()">
+              <span id="recipe-save-spinner" class="btn-spinner hidden"></span>
+              Reçeteyi Kaydet
+            </button>
+          </div>
+          <div id="recipe-form-alert" class="manage-alert hidden"></div>
+        </div>
+
+        <!-- Reçete Listesi -->
+        <div id="recipes-list-container">
+          <div class="manage-loading" id="recipes-loading">
+            <div class="loading-spinner-lg"></div><p>Reçeteler yükleniyor…</p>
+          </div>
+          <div id="recipes-cards-area" class="recipes-cards-area hidden"></div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Alt Bilgi -->
+    <footer class="footer">
+      <p>Anaokulu Yemekhane Stok Takip ve Otomasyon Sistemi &bull; Backend API v1.0</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

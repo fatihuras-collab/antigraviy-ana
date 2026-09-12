@@ -37,8 +37,29 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// ── Frontend statik dosyaları sun (http://localhost:3000) ───────────────────
-app.use(express.static(path.join(__dirname, '../frontend')));
+// ── Frontend statik dosyaları sun (Kök adreste / panel açılır) ──────────────
+const candidateDirs = [
+  path.join(__dirname, 'public'),
+  path.join(__dirname, 'frontend'),
+  path.join(__dirname, '../frontend')
+];
+
+const frontendDir = candidateDirs.find(dir => fs.existsSync(path.join(dir, 'index.html'))) || path.join(__dirname, 'public');
+
+console.log(`📁 Statik frontend dizini: ${frontendDir}`);
+
+// Statik varlıkları sun (index.html, style.css, app.js vb.)
+app.use(express.static(frontendDir));
+
+// Kök adres (/) için index.html'i açıkça sun
+app.get('/', (_req, res) => {
+  const indexPath = path.join(frontendDir, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(404).json({ success: false, error: 'Frontend index.html bulunamadı.' });
+  }
+});
 
 // ── Sağlık kontrolü ──────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
@@ -59,7 +80,19 @@ app.use('/api/recipes',            require('./routes/recipes'));
 app.use('/api/settings',           require('./routes/settings'));
 
 // ── 404 yakalayıcı ───────────────────────────────────────────────────────────
-app.use((_req, res) => {
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ success: false, error: 'Endpoint bulunamadı.' });
+  }
+
+  // GET isteklerinde index.html fallback (SPA yönlendirmesi için)
+  if (req.method === 'GET') {
+    const indexPath = path.join(frontendDir, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      return res.sendFile(indexPath);
+    }
+  }
+
   res.status(404).json({ success: false, error: 'Endpoint bulunamadı.' });
 });
 
