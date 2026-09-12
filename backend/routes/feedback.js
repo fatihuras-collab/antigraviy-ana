@@ -406,6 +406,43 @@ router.get('/today', async (req, res) => {
 // 4 haftanın tüm menü planını (20 gün x 3 öğün) döner
 router.get('/monthly-overview', async (req, res) => {
   try {
+    // 1. ÖNCELİK: monthly_menu tablosundan çek (AI ile yüklenen gerçek aylık menü)
+    const { data: mRows, error: mErr } = await supabase
+      .from('monthly_menu')
+      .select(`
+        id,
+        date,
+        day_of_week,
+        week_number,
+        meal_type,
+        recipe_id,
+        recipes (
+          id,
+          meal_name,
+          meal_type
+        )
+      `)
+      .order('date')
+      .order('day_of_week');
+
+    if (!mErr && mRows && mRows.length > 0) {
+      const grouped = { 1: {}, 2: {}, 3: {}, 4: {} };
+      mRows.forEach(r => {
+        const w = r.week_number || 1;
+        const d = r.day_of_week;
+        if (!grouped[w]) grouped[w] = {};
+        if (!grouped[w][d]) grouped[w][d] = {};
+        grouped[w][d][r.meal_type] = {
+          recipe_id:   r.recipes?.id || r.recipe_id,
+          recipe_name: r.recipes?.meal_name,
+          date:        r.date
+        };
+      });
+
+      return res.json({ success: true, weeks: grouped, source: 'monthly_menu' });
+    }
+
+    // 2. FALLBACK: weekly_menu tablosu
     const { data: rows, error } = await supabase
       .from('weekly_menu')
       .select(`
@@ -435,6 +472,7 @@ router.get('/monthly-overview', async (req, res) => {
     (rows || []).forEach(r => {
       const w = validFromToWeek[r.valid_from] || 1;
       const d = r.day_of_week;
+      if (!grouped[w]) grouped[w] = {};
       if (!grouped[w][d]) grouped[w][d] = {};
       grouped[w][d][r.meal_type] = {
         recipe_id:   r.recipes?.id,
@@ -442,11 +480,10 @@ router.get('/monthly-overview', async (req, res) => {
       };
     });
 
-    res.json({ success: true, weeks: grouped });
+    res.json({ success: true, weeks: grouped, source: 'weekly_menu' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
 module.exports = router;
-

@@ -50,9 +50,9 @@ function switchTab(tabName) {
   activeTab?.classList.add('tab-active');
   activeTab?.setAttribute('aria-selected', 'true');
 
-  if (tabName === 'feedback') loadFeedbackMeals();
-  if (tabName === 'menu')     loadMonthlyMenu();
-  if (tabName === 'manage')   loadManagePanel();
+  if (tabName === 'feedback')   loadFeedbackMeals();
+  if (tabName === 'menu')       loadMonthlyMenu(true);
+  if (tabName === 'manage')     loadManagePanel();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -455,14 +455,14 @@ const DAYS_META = [
   { day: 5, name: 'Cuma' }
 ];
 
-async function loadMonthlyMenu() {
+async function loadMonthlyMenu(force = false) {
   const tbody = document.getElementById('monthly-table-body');
   if (!tbody) return;
 
-  if (!cachedMonthlyMenu) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);">Menü yükleniyor...</td></tr>`;
+  if (!cachedMonthlyMenu || force) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--text-muted);"><div class="loading-spinner-lg" style="margin:0 auto 10px;"></div>Menü yükleniyor...</td></tr>`;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/meal-feedback/monthly-overview`);
+      const res = await fetch(`${API_BASE_URL}/api/meal-feedback/monthly-overview?t=${Date.now()}`);
       const data = await res.json();
       if (data.success) {
         cachedMonthlyMenu = data.weeks;
@@ -496,12 +496,13 @@ function showMonthlyWeek(weekNum) {
     const kahvalti = dayMeals.kahvalti?.recipe_name || '—';
     const ogle     = dayMeals.ogle?.recipe_name || '—';
     const ikindi   = dayMeals.ikindi?.recipe_name || '—';
+    const dateStr  = dayMeals.kahvalti?.date || dayMeals.ogle?.date || dayMeals.ikindi?.date;
 
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>
         <div class="menu-day-name">${dm.name}</div>
-        <div class="menu-day-sub">${weekNum}. Hafta</div>
+        <div class="menu-day-sub">${dateStr ? dateStr : `${weekNum}. Hafta`}</div>
       </td>
       <td>
         <div class="menu-meal-cell meal-cell-kahvalti">${escapeHtml(kahvalti)}</div>
@@ -1432,6 +1433,8 @@ async function menuSave() {
       saveAlert.innerHTML = `<span>❌</span><div><p class="alert-title">Kaydetme hatası</p><p class="alert-message">${data.error}</p></div>`;
       return;
     }
+
+    cachedMonthlyMenu = null;
 
     const recetesizler = data.recetesiz_yemekler || [];
     let html = `<div class="mu-success-box">
