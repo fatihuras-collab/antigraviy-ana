@@ -10,6 +10,23 @@ const express = require('express');
 const router  = express.Router();
 const supabase = require('../supabase');
 
+// Ürün nesnesine güncel stok bilgisini ekleyen yardımcı fonksiyon
+function formatProductWithStock(p) {
+  let qty = 0;
+  if (p.current_stock) {
+    if (typeof p.current_stock === 'object' && !Array.isArray(p.current_stock)) {
+      qty = p.current_stock.quantity != null ? parseFloat(p.current_stock.quantity) : 0;
+    } else if (Array.isArray(p.current_stock) && p.current_stock.length > 0) {
+      qty = p.current_stock[0]?.quantity != null ? parseFloat(p.current_stock[0].quantity) : 0;
+    }
+  }
+  return {
+    ...p,
+    stock_quantity: qty,
+    current_stock: { quantity: qty }
+  };
+}
+
 // ─── GET /api/products ───────────────────────────────────────────────────────
 // Tüm ürünleri, isteğe bağlı category filtresiyle listele
 // ?category=et  →  sadece et kategorisindeki ürünler
@@ -17,7 +34,7 @@ router.get('/', async (req, res) => {
   try {
     let query = supabase
       .from('products')
-      .select('*')
+      .select('*, current_stock(quantity)')
       .order('category')
       .order('name');
 
@@ -28,7 +45,9 @@ router.get('/', async (req, res) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    res.json({ success: true, count: data.length, data });
+    const formatted = (data || []).map(formatProductWithStock);
+
+    res.json({ success: true, count: formatted.length, data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -39,14 +58,14 @@ router.get('/:id', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select('*, current_stock(quantity)')
       .eq('id', req.params.id)
       .single();
 
     if (error) throw error;
     if (!data) return res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
 
-    res.json({ success: true, data });
+    res.json({ success: true, data: formatProductWithStock(data) });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -641,6 +641,53 @@ function escapeHtml(str) {
 // Önce ürünleri önbellekte tut (reçete formundaki dropdown için)
 let _cachedProducts = [];
 
+function getProductStockQty(p) {
+  if (p.stock_quantity != null) return parseFloat(p.stock_quantity);
+  if (typeof p.current_stock === 'number') return p.current_stock;
+  if (p.current_stock && typeof p.current_stock === 'object') {
+    if (Array.isArray(p.current_stock)) {
+      return p.current_stock[0]?.quantity != null ? parseFloat(p.current_stock[0].quantity) : 0;
+    }
+    return p.current_stock.quantity != null ? parseFloat(p.current_stock.quantity) : 0;
+  }
+  return 0;
+}
+
+function formatStockQuantity(val) {
+  if (val == null || isNaN(val) || val === '') return '0';
+  const num = parseFloat(val);
+  return Number.isInteger(num) ? num.toString() : parseFloat(num.toFixed(2)).toString();
+}
+
+function getProductRiskScore(p) {
+  const stockQty = getProductStockQty(p);
+  const thresh = (p.critical_threshold != null && p.critical_threshold !== '') ? parseFloat(p.critical_threshold) : null;
+
+  if (thresh != null) {
+    if (thresh > 0) {
+      return {
+        ratio: stockQty / thresh,
+        diff: stockQty - thresh,
+        isCritical: stockQty <= thresh,
+        hasThresh: true
+      };
+    } else {
+      return {
+        ratio: stockQty <= 0 ? 0 : Infinity,
+        diff: stockQty,
+        isCritical: stockQty <= 0,
+        hasThresh: true
+      };
+    }
+  }
+  return {
+    ratio: Infinity,
+    diff: Infinity,
+    isCritical: false,
+    hasThresh: false
+  };
+}
+
 async function loadManagePanel() {
   await Promise.all([loadProducts(), loadRecipes()]);
 }
@@ -661,15 +708,42 @@ async function loadProducts() {
     const data = await res.json();
     _cachedProducts = data.data || [];
 
+    // Stoğu kritik eşiğine en yakın olan (yani en riskli) ürünler en üstte olacak şekilde sırala
+    const sortedProducts = [..._cachedProducts].sort((a, b) => {
+      const scoreA = getProductRiskScore(a);
+      const scoreB = getProductRiskScore(b);
+
+      if (scoreA.ratio !== scoreB.ratio) {
+        return scoreA.ratio - scoreB.ratio;
+      }
+      if (scoreA.diff !== scoreB.diff) {
+        return scoreA.diff - scoreB.diff;
+      }
+      return (a.name || '').localeCompare(b.name || '', 'tr');
+    });
+
     tbody.innerHTML = '';
-    _cachedProducts.forEach(p => {
+    sortedProducts.forEach(p => {
+      const stockQty   = getProductStockQty(p);
+      const thresh     = (p.critical_threshold != null && p.critical_threshold !== '') ? parseFloat(p.critical_threshold) : null;
+      const isCritical = thresh != null ? (stockQty <= thresh) : false;
+
+      const formattedStock = `${formatStockQuantity(stockQty)} ${escapeHtml(p.unit || '')}`;
+      const statusBadge = isCritical
+        ? `<span class="badge badge-danger"><span class="badge-dot"></span>Kritik</span>`
+        : `<span class="badge badge-success"><span class="badge-dot"></span>Normal</span>`;
+
       const tr = document.createElement('tr');
+      if (isCritical) {
+        tr.classList.add('row-critical');
+      }
       tr.innerHTML = `
         <td><span class="item-name">${escapeHtml(p.name)}</span></td>
-        <td>${escapeHtml(p.unit)}</td>
+        <td>${escapeHtml(p.unit || '—')}</td>
         <td>${p.category ? `<span class="cat-badge">${escapeHtml(p.category)}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td class="text-right">${p.critical_threshold ?? '—'}</td>
-        <td class="text-right">${p.protein_per_unit != null ? p.protein_per_unit + ' g' : '—'}</td>
+        <td class="text-right">${p.critical_threshold != null ? `${formatStockQuantity(p.critical_threshold)} ${escapeHtml(p.unit || '')}` : '—'}</td>
+        <td class="text-right font-medium"><span class="${isCritical ? 'text-danger' : ''}">${formattedStock}</span></td>
+        <td class="text-center">${statusBadge}</td>
         <td class="text-center">
           <button class="btn-delete" title="Sil" onclick="deleteProduct(${p.id}, '${escapeHtml(p.name)}')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
