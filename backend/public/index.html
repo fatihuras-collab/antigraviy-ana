@@ -402,6 +402,29 @@
             </button>
           </div>
         </div>
+
+        <!-- Gerçek Kullanıma Hazırlık (Sıfırlama) -->
+        <div class="system-reset-card" style="margin-top: 14px; background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.22); border-radius: var(--radius-md); padding: 16px 20px;">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
+            <div style="flex: 1; min-width: 260px;">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <span style="font-size: 1.15rem;">🚀</span>
+                <strong style="color: #fca5a5; font-size: 0.95rem; letter-spacing: 0.01em;">Sistemi Gerçek Kullanıma Hazırla</strong>
+                <span class="badge badge-danger" style="font-size: 0.68rem; padding: 2px 7px;">Geri Alınamaz</span>
+              </div>
+              <p style="font-size: 0.82rem; color: #94a3b8; margin: 0; line-height: 1.5;">
+                Tüm test stok hareketlerini (fatura ve tüketim geçmişi), öğün planlarını ve değerlendirmeleri siler; mevcut ürünlerin güncel stoklarını <strong>0</strong> yapar. <span style="color: #cbd5e1;">(Ürün tanımları, reçeteler ve aylık menüye dokunulmaz).</span>
+              </p>
+            </div>
+            <div>
+              <button type="button" class="btn btn-reset-system" id="btn-reset-system" onclick="resetSystemForProduction()">
+                <span id="reset-system-spinner" class="btn-spinner hidden"></span>
+                <span>🧹 Gerçek Kullanıma Hazırla</span>
+              </button>
+            </div>
+          </div>
+          <div id="reset-system-alert" class="manage-alert hidden" style="margin-top: 12px;"></div>
+        </div>
       </section>
 
       <!-- ── Ürünler Bölümü ── -->

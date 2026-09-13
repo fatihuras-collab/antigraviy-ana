@@ -106,4 +106,66 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ─── POST /api/settings/reset-system ──────────────────────────────────────────
+// Sistemi gerçek kullanıma hazırlar:
+// 1. stock_transactions tablosundaki tüm kayıtları siler (fatura ve tüketim geçmişi).
+// 2. current_stock tablosundaki tüm miktarları 0 yapar.
+// 3. meal_feedback ve meal_plans tablolarındaki test kayıtlarını siler.
+// DOKUNULMAZ: products (ürün tanımları), recipes (reçeteler), monthly_menu (menü), app_settings
+router.post('/reset-system', async (_req, res) => {
+  try {
+    // 1. stock_transactions sil
+    const { error: errTrans } = await supabase
+      .from('stock_transactions')
+      .delete()
+      .gt('id', 0);
+    if (errTrans) throw new Error(`stock_transactions silinemedi: ${errTrans.message}`);
+
+    // 2. meal_feedback sil
+    const { error: errFeedback } = await supabase
+      .from('meal_feedback')
+      .delete()
+      .gt('id', 0);
+    if (errFeedback) throw new Error(`meal_feedback silinemedi: ${errFeedback.message}`);
+
+    // 3. meal_plans sil
+    const { error: errPlans } = await supabase
+      .from('meal_plans')
+      .delete()
+      .gt('id', 0);
+    if (errPlans) throw new Error(`meal_plans silinemedi: ${errPlans.message}`);
+
+    // 4. current_stock tablosundaki tüm miktarları 0 yap
+    const { error: errStockUpdate } = await supabase
+      .from('current_stock')
+      .update({ quantity: 0, last_updated: new Date().toISOString() })
+      .gt('product_id', 0);
+    if (errStockUpdate) throw new Error(`current_stock güncellenemedi: ${errStockUpdate.message}`);
+
+    // Tüm mevcut ürünlerin current_stock kaydı olduğundan ve 0 olduğundan emin ol
+    const { data: products, error: prodErr } = await supabase
+      .from('products')
+      .select('id');
+    if (!prodErr && products && products.length > 0) {
+      const resetRows = products.map(p => ({
+        product_id: p.id,
+        quantity: 0,
+        last_updated: new Date().toISOString()
+      }));
+      await supabase
+        .from('current_stock')
+        .upsert(resetRows, { onConflict: 'product_id' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Sistem gerçek kullanıma hazırlandı! Stok hareketleri ve test kayıtları silindi, tüm stoklar 0 olarak güncellendi.'
+    });
+  } catch (err) {
+    console.error('[reset-system HATA]', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;
+

@@ -1288,6 +1288,50 @@ async function saveAgeSetting() {
   }
 }
 
+// ── Sistemi Gerçek Kullanıma Hazırla ──────────────────────────────────────────
+async function resetSystemForProduction() {
+  const confirmed = confirm('Emin misiniz? Tüm stok geçmişi silinecek, ürün listesi kalacak');
+  if (!confirmed) return;
+
+  const btn     = document.getElementById('btn-reset-system');
+  const spinner = document.getElementById('reset-system-spinner');
+  const alertEl = document.getElementById('reset-system-alert');
+
+  if (btn) btn.disabled = true;
+  spinner?.classList.remove('hidden');
+  if (alertEl) alertEl.classList.add('hidden');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/settings/reset-system`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      showManageAlert(alertEl, data.error || 'Sıfırlama işlemi sırasında bir hata oluştu.', 'err');
+      return;
+    }
+
+    showManageAlert(alertEl, data.message || 'Sistem gerçek kullanıma hazırlandı! Güncel stoklar sıfırlandı.', 'ok');
+
+    // Ürün listesini hemen yeniden yükle (tüm ürünlerin stoğu 0 olarak güncellenir)
+    await loadProducts();
+
+    // Varsa öğün değerlendirme ve menü önbelleklerini tazele
+    if (typeof loadFeedbackMeals === 'function') {
+      try { await loadFeedbackMeals(); } catch (_) {}
+    }
+  } catch (err) {
+    showManageAlert(alertEl, 'Bağlantı hatası: ' + err.message, 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+    spinner?.classList.add('hidden');
+  }
+}
+
+
 // =============================================================================
 // AYLIK MENÜ YÜKLEME — menu upload panel logic
 // =============================================================================
