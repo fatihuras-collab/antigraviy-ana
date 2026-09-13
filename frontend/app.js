@@ -28,14 +28,16 @@ function switchTab(tabName) {
     feedback:     'panel-feedback',
     menu:         'panel-menu',
     manage:       'panel-manage',
-    menuupload:   'panel-menuupload'
+    menuupload:   'panel-menuupload',
+    analysis:     'panel-analysis'
   };
   const tabs = {
     consumption:  'tab-consumption',
     feedback:     'tab-feedback',
     menu:         'tab-menu',
     manage:       'tab-manage',
-    menuupload:   'tab-menuupload'
+    menuupload:   'tab-menuupload',
+    analysis:     'tab-analysis'
   };
 
   Object.values(panels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
@@ -53,6 +55,7 @@ function switchTab(tabName) {
   if (tabName === 'feedback')   loadFeedbackMeals();
   if (tabName === 'menu')       loadMonthlyMenu(true);
   if (tabName === 'manage')     loadManagePanel();
+  if (tabName === 'analysis')   loadAnalysisPanel();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1581,3 +1584,582 @@ async function menuSave() {
     saveSpinner.classList.add('hidden');
   }
 }
+
+// =============================================================================
+// ANALİZ & GÖSTERGE PANELİ (CHART.JS)
+// =============================================================================
+
+let _analyticsData = null;
+let _analyticsRange = 12; // 6 veya 12 ay
+let _analyticsSelectedMonth = null; // 'YYYY-MM'
+let _analyticsSelectedProductId = null;
+
+let _chartMonthly = null;
+let _chartCategory = null;
+let _chartTopProducts = null;
+let _chartProductTrend = null;
+
+const AY_ADLARI = [
+  'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+  'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+];
+
+const CATEGORY_COLORS = {
+  'sebze':        { bg: 'rgba(16, 185, 129, 0.75)',  border: '#10b981' },
+  'meyve':        { bg: 'rgba(245, 158, 11, 0.75)',  border: '#f59e0b' },
+  'et & balık':   { bg: 'rgba(244, 63, 94, 0.75)',   border: '#f43f5e' },
+  'et_balik':     { bg: 'rgba(244, 63, 94, 0.75)',   border: '#f43f5e' },
+  'süt ürünleri': { bg: 'rgba(6, 182, 212, 0.75)',   border: '#06b6d4' },
+  'sut_urunleri': { bg: 'rgba(6, 182, 212, 0.75)',   border: '#06b6d4' },
+  'bakliyat':     { bg: 'rgba(139, 92, 246, 0.75)',  border: '#8b5cf6' },
+  'tahıl':        { bg: 'rgba(234, 179, 8, 0.75)',   border: '#eab308' },
+  'tahil':        { bg: 'rgba(234, 179, 8, 0.75)',   border: '#eab308' },
+  'fırın':        { bg: 'rgba(217, 119, 6, 0.75)',   border: '#d97706' },
+  'firin':        { bg: 'rgba(217, 119, 6, 0.75)',   border: '#d97706' },
+  'kahvaltılık':  { bg: 'rgba(99, 102, 241, 0.75)',  border: '#6366f1' },
+  'kahvaltilik':  { bg: 'rgba(99, 102, 241, 0.75)',  border: '#6366f1' },
+  'yağ':          { bg: 'rgba(202, 138, 4, 0.75)',   border: '#ca8a04' },
+  'yag':          { bg: 'rgba(202, 138, 4, 0.75)',   border: '#ca8a04' },
+  'baharat':      { bg: 'rgba(236, 72, 153, 0.75)',  border: '#ec4899' },
+  'çorbalık':     { bg: 'rgba(20, 184, 166, 0.75)',  border: '#14b8a6' },
+  'unlu mamül':   { bg: 'rgba(249, 115, 22, 0.75)',  border: '#f97316' },
+  'kuru gıda':    { bg: 'rgba(168, 85, 247, 0.75)',  border: '#a855f7' },
+  'diger':        { bg: 'rgba(148, 163, 184, 0.75)', border: '#94a3b8' }
+};
+
+function getCategoryColor(cat) {
+  const c = (cat || 'diger').toLowerCase().trim();
+  return CATEGORY_COLORS[c] || { bg: 'rgba(59, 130, 246, 0.75)', border: '#3b82f6' };
+}
+
+function getMonthRangeKeys(n = 12) {
+  const list = [];
+  const now = new Date();
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const key = `${yyyy}-${mm}`;
+    const label = `${AY_ADLARI[d.getMonth()]} ${yyyy}`;
+    const shortLabel = `${AY_ADLARI[d.getMonth()].slice(0, 3)} '${String(yyyy).slice(2)}`;
+    list.push({ key, label, shortLabel });
+  }
+  return list;
+}
+
+function getChartDefaultOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    color: '#94a3b8',
+    plugins: {
+      legend: {
+        labels: {
+          color: '#cbd5e1',
+          font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 },
+          usePointStyle: true,
+          pointStyle: 'circle',
+          boxWidth: 8
+        }
+      },
+      tooltip: {
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        titleColor: '#ffffff',
+        bodyColor: '#e2e8f0',
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        borderWidth: 1,
+        padding: 10,
+        cornerRadius: 8,
+        titleFont: { family: "'Plus Jakarta Sans', sans-serif", weight: '700' },
+        bodyFont: { family: "'Plus Jakarta Sans', sans-serif" }
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+        ticks: { color: '#94a3b8', font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 } }
+      },
+      y: {
+        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+        ticks: { color: '#94a3b8', font: { family: "'Plus Jakarta Sans', sans-serif", size: 11 }, beginAtZero: true }
+      }
+    }
+  };
+}
+
+async function loadAnalysisPanel() {
+  if (typeof Chart === 'undefined') {
+    console.warn('[Chart.js henüz yüklenmedi]');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/analytics/summary?months=12`);
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Analiz verisi alınamadı');
+
+    _analyticsData = json;
+
+    const txs   = _analyticsData.data?.transactions || [];
+    const prods = _analyticsData.data?.products || [];
+
+    // Boş durum bilgilendirmesi
+    const emptyNotice = document.getElementById('analytics-empty-notice');
+    if (emptyNotice) {
+      if (txs.length === 0) emptyNotice.classList.remove('hidden');
+      else emptyNotice.classList.add('hidden');
+    }
+
+    // Ay ve ürün dropdown'larını başlat
+    initAnalysisMonthSelect(txs);
+    initAnalysisProductSelect(prods, txs);
+
+    // KPI ve Grafikleri çiz
+    updateAnalysisKPIs();
+    renderMonthlyConsumptionChart();
+    renderCategoryDistChart();
+    renderTopProductsChart();
+    renderProductTrendChart();
+  } catch (err) {
+    console.error('[loadAnalysisPanel HATA]', err);
+  }
+}
+
+function initAnalysisMonthSelect(txs) {
+  const select = document.getElementById('analysis-month-select');
+  if (!select) return;
+
+  const monthRange = getMonthRangeKeys(12);
+
+  // Veri bulunan ayları tespit et
+  const activeMonths = new Set(txs.map(t => (t.transaction_date || '').slice(0, 7)));
+
+  if (!_analyticsSelectedMonth || !monthRange.some(m => m.key === _analyticsSelectedMonth)) {
+    const latestWithData = [...monthRange].reverse().find(m => activeMonths.has(m.key));
+    _analyticsSelectedMonth = latestWithData ? latestWithData.key : monthRange[monthRange.length - 1].key;
+  }
+
+  select.innerHTML = monthRange.map(m => {
+    const hasData = activeMonths.has(m.key);
+    return `<option value="${m.key}" ${m.key === _analyticsSelectedMonth ? 'selected' : ''}>${m.label}${hasData ? ' (Kayıt Var)' : ''}</option>`;
+  }).join('');
+}
+
+function initAnalysisProductSelect(prods, txs) {
+  const select = document.getElementById('analysis-product-select');
+  if (!select) return;
+
+  const activeProdIds = new Set(txs.map(t => t.product_id));
+
+  if (!_analyticsSelectedProductId && prods.length > 0) {
+    const firstActive = prods.find(p => activeProdIds.has(p.id));
+    _analyticsSelectedProductId = firstActive ? firstActive.id : prods[0].id;
+  }
+
+  select.innerHTML = prods.map(p => {
+    const isActive = activeProdIds.has(p.id);
+    return `<option value="${p.id}" ${p.id == _analyticsSelectedProductId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.unit || '')})${isActive ? ' •' : ''}</option>`;
+  }).join('');
+}
+
+function updateAnalysisKPIs() {
+  const txs = _analyticsData?.data?.transactions || [];
+
+  const totalEl     = document.getElementById('kpi-total-txs');
+  const monthEl     = document.getElementById('kpi-month-total');
+  const categoryEl  = document.getElementById('kpi-top-category');
+  const activeEl    = document.getElementById('kpi-active-products');
+  const monthSubEl  = document.getElementById('kpi-month-sub');
+
+  if (totalEl) totalEl.textContent = txs.length.toString();
+
+  const currentMonthTxs = txs.filter(t => (t.transaction_date || '').startsWith(_analyticsSelectedMonth));
+
+  if (monthSubEl) {
+    const monthObj = getMonthRangeKeys(12).find(m => m.key === _analyticsSelectedMonth);
+    monthSubEl.textContent = monthObj ? monthObj.label : _analyticsSelectedMonth;
+  }
+
+  if (monthEl) {
+    if (_analyticsData?.has_price_data) {
+      const totalTL = currentMonthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.unit_price || 0)), 0);
+      monthEl.textContent = `₺${totalTL.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    } else {
+      const totalQty = currentMonthTxs.reduce((sum, t) => sum + parseFloat(t.quantity || 0), 0);
+      monthEl.textContent = `${totalQty.toFixed(1)} birim`;
+    }
+  }
+
+  if (categoryEl) {
+    const catMap = {};
+    currentMonthTxs.forEach(t => {
+      const cat = t.products?.category || 'Diğer';
+      catMap[cat] = (catMap[cat] || 0) + parseFloat(t.quantity || 0);
+    });
+    const sortedCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+    categoryEl.textContent = sortedCats.length > 0 ? sortedCats[0][0].toUpperCase() : '—';
+  }
+
+  if (activeEl) {
+    const distinctProds = new Set(txs.map(t => t.product_id));
+    activeEl.textContent = distinctProds.size.toString();
+  }
+}
+
+function setAnalysisRange(n) {
+  _analyticsRange = n;
+  document.getElementById('btn-range-6')?.classList.toggle('active', n === 6);
+  document.getElementById('btn-range-12')?.classList.toggle('active', n === 12);
+  renderMonthlyConsumptionChart();
+  renderProductTrendChart();
+}
+
+function onAnalysisMonthChange() {
+  const select = document.getElementById('analysis-month-select');
+  if (select) {
+    _analyticsSelectedMonth = select.value;
+    updateAnalysisKPIs();
+    renderCategoryDistChart();
+    renderTopProductsChart();
+  }
+}
+
+function onAnalysisProductChange() {
+  const select = document.getElementById('analysis-product-select');
+  if (select) {
+    _analyticsSelectedProductId = parseInt(select.value, 10);
+    renderProductTrendChart();
+  }
+}
+
+// ── 1. GENEL AYLIK TÜKETİM GRAFİĞİ ──────────────────────────────────────────
+function renderMonthlyConsumptionChart() {
+  const ctx = document.getElementById('chart-monthly-consumption')?.getContext('2d');
+  if (!ctx) return;
+
+  if (_chartMonthly) _chartMonthly.destroy();
+
+  const txs = _analyticsData?.data?.transactions || [];
+  const hasPrice = !!_analyticsData?.has_price_data;
+  const monthList = getMonthRangeKeys(_analyticsRange);
+  const labels = monthList.map(m => m.shortLabel);
+
+  const titleEl = document.getElementById('main-chart-title');
+  const subEl   = document.getElementById('main-chart-subtitle');
+
+  if (hasPrice) {
+    if (titleEl) titleEl.textContent = '📈 Genel Aylık Tüketim Tutarı (TL)';
+    if (subEl)   subEl.textContent   = 'Her ayın toplam parasal tüketim tutarı (Miktar × Birim Fiyat)';
+
+    const monthlyValues = monthList.map(m => {
+      const monthTxs = txs.filter(t => (t.transaction_date || '').startsWith(m.key));
+      return monthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.unit_price || 0)), 0);
+    });
+
+    _chartMonthly = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Toplam Tüketim (₺)',
+          data: monthlyValues,
+          backgroundColor: 'rgba(16, 185, 129, 0.75)',
+          borderColor: '#10b981',
+          borderWidth: 1.5,
+          borderRadius: 6
+        }]
+      },
+      options: {
+        ...getChartDefaultOptions(),
+        plugins: {
+          ...getChartDefaultOptions().plugins,
+          tooltip: {
+            ...getChartDefaultOptions().plugins.tooltip,
+            callbacks: {
+              label: (ctx) => ` ₺${(ctx.raw || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`
+            }
+          }
+        }
+      }
+    });
+  } else {
+    // Fiyat yoksa KATEGORİ BAZLI GRUPLU ÇUBUK GRAFİK
+    if (titleEl) titleEl.textContent = '📈 Genel Aylık Tüketim (Kategori Bazlı)';
+    if (subEl)   subEl.textContent   = 'Birim fiyat verisi bulunmadığından kategorilere göre gruplanmış tüketim miktarları';
+
+    const catSet = new Set();
+    txs.forEach(t => { if (t.products?.category) catSet.add(t.products.category); });
+    let categories = Array.from(catSet);
+    if (categories.length === 0) {
+      categories = ['sebze', 'meyve', 'et & balık', 'süt ürünleri', 'bakliyat', 'tahıl'];
+    }
+
+    const datasets = categories.map(cat => {
+      const col = getCategoryColor(cat);
+      const data = monthList.map(m => {
+        const monthTxs = txs.filter(t => (t.transaction_date || '').startsWith(m.key) && (t.products?.category || '').toLowerCase() === cat.toLowerCase());
+        return monthTxs.reduce((sum, t) => sum + parseFloat(t.quantity || 0), 0);
+      });
+      return {
+        label: cat.toUpperCase(),
+        data,
+        backgroundColor: col.bg,
+        borderColor: col.border,
+        borderWidth: 1,
+        borderRadius: 4
+      };
+    });
+
+    _chartMonthly = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets },
+      options: {
+        ...getChartDefaultOptions(),
+        scales: {
+          ...getChartDefaultOptions().scales,
+          y: {
+            ...getChartDefaultOptions().scales.y,
+            title: { display: true, text: 'Miktar', color: '#94a3b8' }
+          }
+        }
+      }
+    });
+  }
+}
+
+// ── 2. KATEGORİ DAĞILIMI (SEÇİLEN AY) ────────────────────────────────────────
+function renderCategoryDistChart() {
+  const ctx = document.getElementById('chart-category-dist')?.getContext('2d');
+  if (!ctx) return;
+
+  if (_chartCategory) _chartCategory.destroy();
+
+  const txs = _analyticsData?.data?.transactions || [];
+  const monthTxs = txs.filter(t => (t.transaction_date || '').startsWith(_analyticsSelectedMonth));
+
+  const catMap = {};
+  monthTxs.forEach(t => {
+    const cat = t.products?.category || 'Diğer';
+    catMap[cat] = (catMap[cat] || 0) + parseFloat(t.quantity || 0);
+  });
+
+  const subEl = document.getElementById('cat-dist-subtitle');
+  const monthObj = getMonthRangeKeys(12).find(m => m.key === _analyticsSelectedMonth);
+  if (subEl) subEl.textContent = `${monthObj ? monthObj.label : _analyticsSelectedMonth} ayı kategori bazlı toplam tüketim payı`;
+
+  const labels = Object.keys(catMap);
+  const dataValues = Object.values(catMap);
+
+  if (labels.length === 0) {
+    _chartCategory = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Bu Ay Henüz Kayıt Yok'],
+        datasets: [{ data: [1], backgroundColor: ['rgba(148, 163, 184, 0.15)'], borderWidth: 0 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#94a3b8' } },
+          tooltip: { enabled: false }
+        }
+      }
+    });
+    return;
+  }
+
+  const bgColors = labels.map(c => getCategoryColor(c).bg);
+  const borderColors = labels.map(c => getCategoryColor(c).border);
+  const total = dataValues.reduce((a, b) => a + b, 0);
+
+  _chartCategory = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: dataValues,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        ...getChartDefaultOptions().plugins,
+        legend: {
+          ...getChartDefaultOptions().plugins.legend,
+          position: 'bottom'
+        },
+        tooltip: {
+          ...getChartDefaultOptions().plugins.tooltip,
+          callbacks: {
+            label: (ctx) => {
+              const val = ctx.raw || 0;
+              const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+              return ` ${ctx.label}: ${val.toFixed(2)} birim (%${pct})`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── 3. EN ÇOK TÜKETİLEN 10 ÜRÜN (SEÇİLEN AY) ──────────────────────────────────
+function renderTopProductsChart() {
+  const ctx = document.getElementById('chart-top-products')?.getContext('2d');
+  if (!ctx) return;
+
+  if (_chartTopProducts) _chartTopProducts.destroy();
+
+  const txs = _analyticsData?.data?.transactions || [];
+  const monthTxs = txs.filter(t => (t.transaction_date || '').startsWith(_analyticsSelectedMonth));
+
+  const prodMap = {};
+  monthTxs.forEach(t => {
+    const pid = t.product_id;
+    if (!prodMap[pid]) {
+      prodMap[pid] = {
+        name: t.products?.name || `Ürün #${pid}`,
+        unit: t.products?.unit || '',
+        category: t.products?.category || '',
+        quantity: 0
+      };
+    }
+    prodMap[pid].quantity += parseFloat(t.quantity || 0);
+  });
+
+  const subEl = document.getElementById('top-prod-subtitle');
+  const monthObj = getMonthRangeKeys(12).find(m => m.key === _analyticsSelectedMonth);
+  if (subEl) subEl.textContent = `${monthObj ? monthObj.label : _analyticsSelectedMonth} ayında en yüksek sarfiyat yapılan 10 malzeme`;
+
+  const sorted = Object.values(prodMap).sort((a, b) => b.quantity - a.quantity).slice(0, 10);
+
+  if (sorted.length === 0) {
+    _chartTopProducts = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Bu Ay Henüz Kayıt Yok'],
+        datasets: [{ data: [0], backgroundColor: ['rgba(148, 163, 184, 0.15)'] }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } }
+      }
+    });
+    return;
+  }
+
+  const reversed = [...sorted].reverse();
+  const labels = reversed.map(p => p.name);
+  const dataValues = reversed.map(p => p.quantity);
+  const units = reversed.map(p => p.unit);
+  const bgColors = reversed.map(p => getCategoryColor(p.category).bg);
+  const borderColors = reversed.map(p => getCategoryColor(p.category).border);
+
+  _chartTopProducts = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Tüketim Miktarı',
+        data: dataValues,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      ...getChartDefaultOptions(),
+      indexAxis: 'y',
+      plugins: {
+        ...getChartDefaultOptions().plugins,
+        legend: { display: false },
+        tooltip: {
+          ...getChartDefaultOptions().plugins.tooltip,
+          callbacks: {
+            label: (ctx) => {
+              const u = units[ctx.dataIndex] || '';
+              return ` ${ctx.formattedValue} ${u}`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── 4. ÜRÜN BAZLI TÜKETİM TRENDİ ──────────────────────────────────────────────
+function renderProductTrendChart() {
+  const ctx = document.getElementById('chart-product-trend')?.getContext('2d');
+  if (!ctx) return;
+
+  if (_chartProductTrend) _chartProductTrend.destroy();
+
+  const txs = _analyticsData?.data?.transactions || [];
+  const prods = _analyticsData?.data?.products || [];
+  const monthList = getMonthRangeKeys(_analyticsRange);
+  const labels = monthList.map(m => m.shortLabel);
+
+  const selectedProd = prods.find(p => p.id == _analyticsSelectedProductId);
+  const prodName = selectedProd ? selectedProd.name : 'Seçilen Ürün';
+  const prodUnit = selectedProd ? selectedProd.unit : '';
+  const prodCategory = selectedProd ? selectedProd.category : '';
+
+  const subEl = document.getElementById('prod-trend-subtitle');
+  if (subEl) subEl.textContent = `"${prodName}" ürününün son ${_analyticsRange} aydaki tüketim eğrisi`;
+
+  const values = monthList.map(m => {
+    const pTxs = txs.filter(t => t.product_id == _analyticsSelectedProductId && (t.transaction_date || '').startsWith(m.key));
+    return pTxs.reduce((sum, t) => sum + parseFloat(t.quantity || 0), 0);
+  });
+
+  const col = getCategoryColor(prodCategory);
+
+  _chartProductTrend = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: `${prodName} (${prodUnit})`,
+        data: values,
+        borderColor: col.border || '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+        fill: true,
+        tension: 0.35,
+        pointBackgroundColor: col.border || '#10b981',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 7
+      }]
+    },
+    options: {
+      ...getChartDefaultOptions(),
+      plugins: {
+        ...getChartDefaultOptions().plugins,
+        tooltip: {
+          ...getChartDefaultOptions().plugins.tooltip,
+          callbacks: {
+            label: (ctx) => ` ${prodName}: ${ctx.formattedValue} ${prodUnit}`
+          }
+        }
+      },
+      scales: {
+        ...getChartDefaultOptions().scales,
+        y: {
+          ...getChartDefaultOptions().scales.y,
+          title: { display: true, text: prodUnit ? `Miktar (${prodUnit})` : 'Miktar', color: '#94a3b8' }
+        }
+      }
+    }
+  });
+}
+

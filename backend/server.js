@@ -79,6 +79,7 @@ app.use('/api/meal-feedback',      require('./routes/feedback'));
 app.use('/api/recipes',            require('./routes/recipes'));
 app.use('/api/settings',           require('./routes/settings'));
 app.use('/api/menu',               require('./routes/menu'));
+app.use('/api/analytics',          require('./routes/analytics'));
 
 // ── 404 yakalayıcı ───────────────────────────────────────────────────────────
 app.use((req, res) => {
