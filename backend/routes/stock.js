@@ -11,6 +11,7 @@
 const express  = require('express');
 const router   = express.Router();
 const supabase = require('../supabase');
+const { checkStockAlerts } = require('../services/stockAlertService');
 
 // ─── Yardımcı Fonksiyonlar: Metin Normalizasyonu ve Akıllı Eşleştirme ──────
 function escapeRegex(string) {
@@ -278,6 +279,12 @@ router.post('/in', async (req, res) => {
       .eq('product_id', product.id)
       .single();
 
+    // ── Kritik stok kontrolü ve Telegram uyarısı ─────────────────────────────
+    // Fatura veya stok girişi sonrası stok eşiğin üstüne çıktıysa uyarı durumunu sıfırlar
+    checkStockAlerts([product.id]).catch(err => {
+      console.error('[Stok Uyarı Hatası - stock/in]', err.message);
+    });
+
     // ── Yanıt mesajı ─────────────────────────────────────────────────────────
     let message = '';
     if (matchStatus === 'created') {
@@ -304,6 +311,229 @@ router.post('/in', async (req, res) => {
       current_stock: stock?.quantity ?? null
     });
 
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/stock/out ─────────────────────────────────────────────────────
+// Manuel stok çıkışı (tüketim, fire, zayi) kaydeder ve gerekirse Telegram uyarısı gönderir.
+router.post('/out', async (req, res) => {
+  try {
+    const {
+      product_id,
+      quantity,
+      transaction_date,
+      source_type = 'manual',
+      source_id = null
+    } = req.body;
+
+    if (!product_id || quantity == null) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id ve quantity alanları zorunludur.'
+      });
+    }
+
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'quantity 0\'dan büyük bir sayı olmalıdır.'
+      });
+    }
+
+    const { data: product, error: prodErr } = await supabase
+      .from('products')
+      .select('id, name, unit, critical_threshold')
+      .eq('id', product_id)
+      .single();
+
+    if (prodErr || !product) {
+      return res.status(404).json({
+        success: false,
+        error: 'Ürün bulunamadı.'
+      });
+    }
+
+    // Stok çıkış hareketi ekle (Trigger otomatik olarak current_stock'u azaltır)
+    const { data: transaction, error: txErr } = await supabase
+      .from('stock_transactions')
+      .insert([{
+        product_id: product.id,
+        transaction_type: 'out',
+        quantity:          qty,
+        source_type:       source_type || 'manual',
+        source_id,
+        transaction_date:  transaction_date || new Date().toISOString().split('T')[0]
+      }])
+      .select()
+      .single();
+
+    if (txErr) throw txErr;
+
+    // Güncel stoku çek
+    const { data: stock } = await supabase
+      .from('current_stock')
+      .select('quantity')
+      .eq('product_id', product.id)
+      .single();
+
+    // Kritik stok kontrolü ve Telegram uyarısı
+    checkStockAlerts([product.id]).catch(err => {
+      console.error('[Stok Uyarı Hatası - stock/out]', err.message);
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `${product.name} için ${qty} ${product.unit} stok çıkışı yapıldı.`,
+      product: {
+        id: product.id,
+        name: product.name,
+        unit: product.unit
+      },
+      transaction,
+      current_stock: stock?.quantity ?? null
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/stock/transaction ─────────────────────────────────────────────
+// Genel manuel işlem (in, out, waste)
+router.post('/transaction', async (req, res) => {
+  try {
+    const {
+      product_id,
+      transaction_type = 'out',
+      quantity,
+      transaction_date,
+      source_type = 'manual',
+      source_id = null
+    } = req.body;
+
+    const validTypes = ['in', 'out', 'waste'];
+    if (!validTypes.includes(transaction_type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Geçersiz transaction_type. İzin verilenler: ${validTypes.join(', ')}`
+      });
+    }
+
+    if (!product_id || quantity == null) {
+      return res.status(400).json({
+        success: false,
+        error: 'product_id ve quantity alanları zorunludur.'
+      });
+    }
+
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'quantity 0\'dan büyük bir sayı olmalıdır.'
+      });
+    }
+
+    const { data: product, error: prodErr } = await supabase
+      .from('products')
+      .select('id, name, unit, critical_threshold')
+      .eq('id', product_id)
+      .single();
+
+    if (prodErr || !product) {
+      return res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
+    }
+
+    const { data: transaction, error: txErr } = await supabase
+      .from('stock_transactions')
+      .insert([{
+        product_id: product.id,
+        transaction_type,
+        quantity: qty,
+        source_type: source_type || 'manual',
+        source_id,
+        transaction_date: transaction_date || new Date().toISOString().split('T')[0]
+      }])
+      .select()
+      .single();
+
+    if (txErr) throw txErr;
+
+    const { data: stock } = await supabase
+      .from('current_stock')
+      .select('quantity')
+      .eq('product_id', product.id)
+      .single();
+
+    // Kritik seviye kontrolü (in durumunda eşik üstü sıfırlama, out/waste durumunda uyarı)
+    checkStockAlerts([product.id]).catch(err => {
+      console.error('[Stok Uyarı Hatası - stock/transaction]', err.message);
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `${product.name} için ${qty} ${product.unit} (${transaction_type}) işlemi kaydedildi.`,
+      product: {
+        id: product.id,
+        name: product.name,
+        unit: product.unit
+      },
+      transaction,
+      current_stock: stock?.quantity ?? null
+    });
+
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/stock/test-telegram ───────────────────────────────────────────
+// Telegram bot bağlantısını test eder
+router.post('/test-telegram', async (req, res) => {
+  try {
+    const { sendTelegramMessage, getTelegramConfig } = require('../services/telegramService');
+    const { token, chatId } = getTelegramConfig();
+
+    if (!token || !chatId) {
+      return res.status(400).json({
+        success: false,
+        error: 'TELEGRAM_BOT_TOKEN veya TELEGRAM_CHAT_ID ortam değişkeni eksik. Lütfen Railway ayarlarından ekleyin.'
+      });
+    }
+
+    const testText = req.body.message || '⚠️ [Test] Anaokulu Yemekhane Stok Takip Sistemi — Telegram bildirim bağlantısı başarılı!';
+    const result = await sendTelegramMessage(testText);
+
+    if (result.success) {
+      res.json({ success: true, message: 'Test bildirimi Telegram\'a başarıyla gönderildi.' });
+    } else {
+      res.status(502).json({ success: false, error: result.error || 'Telegram mesajı iletilemedi.' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── GET /api/stock/alert-state ──────────────────────────────────────────────
+// Mevcut uyarı durumu (hangi ürünler için uyarı açık)
+router.get('/alert-state', (req, res) => {
+  try {
+    const { getAlertState } = require('../services/stockAlertService');
+    res.json({ success: true, ...getAlertState() });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ─── POST /api/stock/check-alerts ────────────────────────────────────────────
+// Tüm ürünleri kontrol edip gerekiyorsa uyarıları tetikler
+router.post('/check-alerts', async (req, res) => {
+  try {
+    const result = await checkStockAlerts();
+    res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

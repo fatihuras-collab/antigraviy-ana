@@ -24,6 +24,7 @@
 const express  = require('express');
 const router   = express.Router();
 const supabase = require('../supabase');
+const { checkStockAlerts } = require('../services/stockAlertService');
 
 const GUN_ADLARI = {
   1: 'Pazartesi', 2: 'Salı', 3: 'Çarşamba',
@@ -368,6 +369,11 @@ router.post('/', async (req, res) => {
       .select('product_id, quantity')
       .in('product_id', allProductIds);
 
+    // Stok kritik seviye kontrolü ve Telegram uyarısı
+    checkStockAlerts(allProductIds).catch(err => {
+      console.error('[Stok Uyarı Hatası - consumption/daily]', err.message);
+    });
+
     const stockAfterMap = {};
     (updatedStockRows || []).forEach(s => { stockAfterMap[s.product_id] = parseFloat(s.quantity); });
 
@@ -472,6 +478,14 @@ const cancelConsumptionHandler = async (req, res) => {
       .from('meal_plans')
       .delete()
       .eq('plan_date', targetDate);
+
+    // İptal edilen ürünlerin stokları iade edildiği için kritik durum kontrolü (eşik üstüne çıkanlar sıfırlanır)
+    const cancelledProductIds = (txs || []).map(t => t.product_id);
+    if (cancelledProductIds.length > 0) {
+      checkStockAlerts(cancelledProductIds).catch(err => {
+        console.error('[Stok Uyarı Hatası - consumption/cancel]', err.message);
+      });
+    }
 
     res.json({
       success: true,

@@ -127,5 +127,18 @@ app.listen(PORT, HOST, () => {
   console.log(`   Reçete ekle         : POST /api/recipes`);
   console.log(`   Menü parse (AI)     : POST /api/menu/parse`);
   console.log(`   Menü kaydet         : POST /api/menu/save`);
+  console.log(`   Analiz verisi       : GET  /api/analytics/summary`);
+
+  const hasTelegramToken = !!process.env.TELEGRAM_BOT_TOKEN;
+  const hasTelegramChat  = !!process.env.TELEGRAM_CHAT_ID;
+  console.log(`   Telegram Uyarısı    : ${hasTelegramToken && hasTelegramChat ? '✓ Aktif' : '⚠️ TELEGRAM_BOT_TOKEN veya TELEGRAM_CHAT_ID eksik'}`);
   console.log(`======================================================\n`);
+
+  // Telegram stok uyarı durumunu başlat
+  try {
+    const { initAlertState } = require('./services/stockAlertService');
+    initAlertState().catch(e => console.warn('[StockAlert Init]', e.message));
+  } catch (e) {
+    // sessizce geç
+  }
 });

@@ -157,6 +157,14 @@ router.post('/reset-system', async (_req, res) => {
         .upsert(resetRows, { onConflict: 'product_id' });
     }
 
+    // Telegram stok uyarı geçmişini de sıfırla
+    try {
+      const { clearAlertState } = require('../services/stockAlertService');
+      await clearAlertState();
+    } catch (e) {
+      // sessizce geç
+    }
+
     res.json({
       success: true,
       message: 'Sistem gerçek kullanıma hazırlandı! Stok hareketleri ve test kayıtları silindi, tüm stoklar 0 olarak güncellendi.'
