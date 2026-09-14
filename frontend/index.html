@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2.0.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -854,6 +854,86 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <!-- ════ ÜRÜN DÜZENLEME MODALI (POPUP PENCERE) ════ -->
+  <div id="product-edit-modal" class="modal-overlay hidden" onclick="if(event.target === this) closeProductEditModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="modal-icon">✏️</span>
+          <h3 class="modal-title" id="pmodal-title">Ürünü Düzenle</h3>
+        </div>
+        <button class="modal-close-btn" onclick="closeProductEditModal()" title="Kapat">✕</button>
+      </div>
+      
+      <div class="modal-body">
+        <input type="hidden" id="pmodal-id">
+        
+        <div class="modal-form-grid">
+          <div class="mf-group modal-full-width">
+            <label class="mf-label">Ürün Adı *</label>
+            <input type="text" id="pmodal-name" class="mf-input" placeholder="örn: Domates">
+          </div>
+
+          <div class="mf-group">
+            <label class="mf-label">Birim *</label>
+            <select id="pmodal-unit" class="mf-input mf-select">
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+              <option value="L">L</option>
+              <option value="litre">litre</option>
+              <option value="ml">ml</option>
+              <option value="adet">adet</option>
+              <option value="demet">demet</option>
+              <option value="kutu">kutu</option>
+              <option value="paket">paket</option>
+            </select>
+          </div>
+
+          <div class="mf-group">
+            <label class="mf-label">Kategori</label>
+            <select id="pmodal-category" class="mf-input mf-select">
+              <option value="">— Seçin —</option>
+              <option value="sebze">Sebze</option>
+              <option value="meyve">Meyve</option>
+              <option value="et">Et</option>
+              <option value="et & balık">Et & Balık</option>
+              <option value="süt ürünleri">Süt Ürünleri</option>
+              <option value="bakliyat">Bakliyat</option>
+              <option value="tahıl">Tahıl</option>
+              <option value="yağ">Yağ</option>
+              <option value="kahvaltılık">Kahvaltılık</option>
+              <option value="fırın">Fırın</option>
+              <option value="çorbalık">Çorbalık</option>
+              <option value="salça">Salça</option>
+              <option value="baharat">Baharat</option>
+              <option value="diger">Diğer</option>
+            </select>
+          </div>
+
+          <div class="mf-group">
+            <label class="mf-label">Kritik Eşik</label>
+            <input type="number" id="pmodal-threshold" class="mf-input" placeholder="örn: 5" min="0" step="0.1">
+          </div>
+
+          <div class="mf-group">
+            <label class="mf-label">Protein (g/birim)</label>
+            <input type="number" id="pmodal-protein" class="mf-input" placeholder="örn: 2.5" min="0" step="0.001">
+          </div>
+        </div>
+
+        <div id="pmodal-alert" class="manage-alert hidden" style="margin-top: 15px;"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-outline-sm" onclick="closeProductEditModal()">İptal</button>
+        <button class="btn btn-teal" id="pmodal-save-btn" onclick="saveProductModal()">
+          <span id="pmodal-save-spinner" class="btn-spinner hidden"></span>
+          Kaydet
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js?v=2.0.0"></script>
 </body>
 </html>
