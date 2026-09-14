@@ -643,6 +643,7 @@ function escapeHtml(str) {
 
 // Önce ürünleri önbellekte tut (reçete formundaki dropdown için)
 let _cachedProducts = [];
+let _editingProductId = null;
 
 function getProductStockQty(p) {
   if (p.stock_quantity != null) return parseFloat(p.stock_quantity);
@@ -748,14 +749,22 @@ async function loadProducts() {
         <td class="text-right font-medium"><span class="${isCritical ? 'text-danger' : ''}">${formattedStock}</span></td>
         <td class="text-center">${statusBadge}</td>
         <td class="text-center">
-          <button class="btn-delete" title="Sil" onclick="deleteProduct(${p.id}, '${escapeHtml(p.name)}')">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6l-1 14H6L5 6"></path>
-              <path d="M10 11v6M14 11v6"></path>
-              <path d="M9 6V4h6v2"></path>
-            </svg>
-          </button>
+          <div style="display:inline-flex;align-items:center;justify-content:center;gap:6px;">
+            <button class="btn-edit" title="Düzenle" onclick="editProduct(${p.id})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+            <button class="btn-delete" title="Sil" onclick="deleteProduct(${p.id}, '${escapeHtml(p.name)}')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14H6L5 6"></path>
+                <path d="M10 11v6M14 11v6"></path>
+                <path d="M9 6V4h6v2"></path>
+              </svg>
+            </button>
+          </div>
         </td>
       `;
       tbody.appendChild(tr);
@@ -769,15 +778,119 @@ async function loadProducts() {
   }
 }
 
-function toggleProductForm() {
+function toggleProductForm(forceClose = false) {
   const form = document.getElementById('product-form-container');
   const btn  = document.getElementById('product-form-toggle-btn');
-  const isHidden = form?.classList.toggle('hidden');
-  if (btn) btn.textContent = isHidden ? '+ Yeni Ürün Ekle' : '✕ Kapat';
-  if (!isHidden) {
-    document.getElementById('pf-name')?.focus();
-    document.getElementById('product-form-alert')?.classList.add('hidden');
+  const titleEl = document.getElementById('product-form-title') || form?.querySelector('.manage-form-title');
+  const saveBtn = document.getElementById('product-save-btn');
+
+  let isHidden;
+  if (forceClose) {
+    form?.classList.add('hidden');
+    isHidden = true;
+  } else {
+    isHidden = form?.classList.toggle('hidden');
   }
+
+  if (btn) {
+    btn.innerHTML = isHidden
+      ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> Yeni Ürün Ekle`
+      : '✕ Kapat';
+  }
+
+  if (isHidden) {
+    _editingProductId = null;
+    if (titleEl) titleEl.textContent = 'Yeni Ürün';
+    if (saveBtn) saveBtn.innerHTML = '<span id="product-save-spinner" class="btn-spinner hidden"></span>Kaydet';
+  } else {
+    if (!_editingProductId) {
+      if (titleEl) titleEl.textContent = 'Yeni Ürün';
+      if (saveBtn) saveBtn.innerHTML = '<span id="product-save-spinner" class="btn-spinner hidden"></span>Kaydet';
+      ['pf-name','pf-threshold','pf-protein'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      const catEl = document.getElementById('pf-category');
+      if (catEl) catEl.value = '';
+      const unitEl = document.getElementById('pf-unit');
+      if (unitEl) unitEl.value = 'kg';
+      document.getElementById('pf-name')?.focus();
+      document.getElementById('product-form-alert')?.classList.add('hidden');
+    }
+  }
+}
+
+function editProduct(productId) {
+  const p = _cachedProducts.find(item => item.id === productId);
+  if (!p) return;
+
+  _editingProductId = productId;
+
+  const formBox   = document.getElementById('product-form-container');
+  const toggleBtn = document.getElementById('product-form-toggle-btn');
+  const titleEl   = document.getElementById('product-form-title') || formBox?.querySelector('.manage-form-title');
+  const saveBtn   = document.getElementById('product-save-btn');
+  const alertEl   = document.getElementById('product-form-alert');
+
+  // Formu aç
+  formBox?.classList.remove('hidden');
+  if (toggleBtn) toggleBtn.textContent = '✕ İptal';
+  if (titleEl)   titleEl.textContent = `Ürünü Düzenle: ${p.name}`;
+  if (saveBtn)   saveBtn.innerHTML = '<span id="product-save-spinner" class="btn-spinner hidden"></span>Değişiklikleri Kaydet';
+  if (alertEl)   alertEl.classList.add('hidden');
+
+  // Alanları doldur
+  const nameEl      = document.getElementById('pf-name');
+  const unitEl      = document.getElementById('pf-unit');
+  const categoryEl  = document.getElementById('pf-category');
+  const thresholdEl = document.getElementById('pf-threshold');
+  const proteinEl   = document.getElementById('pf-protein');
+
+  if (nameEl) nameEl.value = p.name || '';
+
+  // Birim dropdown'ında değer yoksa dinamik ekle ve seç
+  if (unitEl) {
+    const unitVal = p.unit || 'kg';
+    let exists = false;
+    for (let i = 0; i < unitEl.options.length; i++) {
+      if (unitEl.options[i].value === unitVal) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists && unitVal) {
+      const opt = document.createElement('option');
+      opt.value = unitVal;
+      opt.textContent = unitVal;
+      unitEl.appendChild(opt);
+    }
+    unitEl.value = unitVal;
+  }
+
+  // Kategori dropdown'ında değer yoksa dinamik ekle ve seç
+  if (categoryEl) {
+    const catVal = p.category || '';
+    let exists = false;
+    for (let i = 0; i < categoryEl.options.length; i++) {
+      if (categoryEl.options[i].value === catVal) {
+        exists = true;
+        break;
+      }
+    }
+    if (!exists && catVal) {
+      const opt = document.createElement('option');
+      opt.value = catVal;
+      opt.textContent = catVal.charAt(0).toUpperCase() + catVal.slice(1);
+      categoryEl.appendChild(opt);
+    }
+    categoryEl.value = catVal;
+  }
+
+  if (thresholdEl) thresholdEl.value = (p.critical_threshold != null && p.critical_threshold !== '') ? p.critical_threshold : '';
+  if (proteinEl)   proteinEl.value = (p.protein_per_unit != null && p.protein_per_unit !== '') ? p.protein_per_unit : '';
+
+  formBox?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  nameEl?.focus();
 }
 
 async function saveProduct() {
@@ -794,40 +907,45 @@ async function saveProduct() {
     showManageAlert(alertEl, 'Ürün adı zorunludur.', 'err');
     return;
   }
+  if (!unit) {
+    showManageAlert(alertEl, 'Birim alanı zorunludur.', 'err');
+    return;
+  }
 
   saveBtn.disabled = true;
   spinner?.classList.remove('hidden');
 
   try {
     const body = { name, unit, category };
-    if (threshold) body.critical_threshold = parseFloat(threshold);
-    if (protein)   body.protein_per_unit   = parseFloat(protein);
+    body.critical_threshold = (threshold !== '' && threshold != null) ? parseFloat(threshold) : null;
+    body.protein_per_unit   = (protein !== '' && protein != null) ? parseFloat(protein) : null;
 
-    const res  = await fetch(`${API_BASE_URL}/api/products`, {
-      method: 'POST',
+    const isEdit = _editingProductId != null;
+    const url    = isEdit ? `${API_BASE_URL}/api/products/${_editingProductId}` : `${API_BASE_URL}/api/products`;
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const res  = await fetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
     const data = await res.json();
 
     if (!res.ok) {
-      showManageAlert(alertEl, data.error || 'Kaydedilemedi.', 'err');
+      showManageAlert(alertEl, data.error || (isEdit ? 'Güncellenemedi.' : 'Kaydedilemedi.'), 'err');
       return;
     }
 
-    showManageAlert(alertEl, `"${name}" ürünü eklendi!`, 'ok');
-    // Formu sıfırla
-    ['pf-name','pf-threshold','pf-protein'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    document.getElementById('pf-category').value = '';
-    // Listeyi yenile
+    showManageAlert(alertEl, isEdit ? `"${name}" ürünü başarıyla güncellendi!` : `"${name}" ürünü eklendi!`, 'ok');
+
+    // Listeyi hemen yenile (anında tabloda güncellensin)
     await loadProducts();
     // Dropdown'ı da güncelle
     rebuildProductDropdowns();
 
-    setTimeout(() => toggleProductForm(), 1200);
+    setTimeout(() => {
+      toggleProductForm(true);
+    }, 1000);
   } catch (err) {
     showManageAlert(alertEl, 'Bağlantı hatası.', 'err');
   } finally {

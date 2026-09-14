@@ -99,6 +99,52 @@ router.post('/', async (req, res) => {
   }
 });
 
+// ─── PUT /api/products/:id ───────────────────────────────────────────────────
+// Ürünü güncelle (ID korunur, stok geçmişi ve reçete bağlantıları bozulmaz)
+// Zorunlu: name, unit
+// Opsiyonel: category, critical_threshold, protein_per_unit
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, unit, category, critical_threshold, protein_per_unit } = req.body;
+
+    if (!name || !unit) {
+      return res.status(400).json({
+        success: false,
+        error: 'name ve unit alanları zorunludur.'
+      });
+    }
+
+    const updateData = {
+      name: name.trim(),
+      unit: unit.trim(),
+      category: category || null,
+      critical_threshold: (critical_threshold !== undefined && critical_threshold !== '' && critical_threshold !== null)
+        ? parseFloat(critical_threshold)
+        : null,
+      protein_per_unit: (protein_per_unit !== undefined && protein_per_unit !== '' && protein_per_unit !== null)
+        ? parseFloat(protein_per_unit)
+        : null
+    };
+
+    const { data, error } = await supabase
+      .from('products')
+      .update(updateData)
+      .eq('id', id)
+      .select('*, current_stock(quantity)')
+      .single();
+
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Güncellenecek ürün bulunamadı.' });
+    }
+
+    res.json({ success: true, message: 'Ürün başarıyla güncellendi.', data: formatProductWithStock(data) });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── DELETE /api/products/:id ────────────────────────────────────────────────
 // Ürünü sil. Stok hareketi kayıtları varsa Supabase FK kısıtı hata verir.
 router.delete('/:id', async (req, res) => {

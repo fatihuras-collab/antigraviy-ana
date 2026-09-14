@@ -1334,6 +1334,27 @@ body {
   letter-spacing: 0.04em;
 }
 
+.btn-edit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-sm);
+  color: #818cf8;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-edit:hover {
+  background: rgba(99, 102, 241, 0.22);
+  border-color: rgba(99, 102, 241, 0.45);
+  color: #a5b4fc;
+  transform: scale(1.1);
+}
+
 .btn-delete {
   display: inline-flex;
   align-items: center;
@@ -2349,7 +2370,8 @@ body {
     font-size: 0.82rem;
   }
 
-  .btn-delete {
+  .btn-delete,
+  .btn-edit {
     min-height: 42px;
     min-width: 42px;
   }
