@@ -121,6 +121,7 @@ app.listen(PORT, HOST, () => {
   console.log(`   Kritik stok         : GET  /api/stock/current?critical=true`);
   console.log(`   Günlük tüketim      : POST /api/daily-consumption`);
   console.log(`   Akşam raporu        : GET  /api/evening-report`);
+  console.log(`   Akşam raporu gönder : GET  /api/evening-report/send`);
   console.log(`   Geri bildirim       : POST /api/meal-feedback`);
   console.log(`   Bugünün öğünleri    : GET  /api/meal-feedback/today`);
   console.log(`   Reçete listesi      : GET  /api/recipes`);
@@ -140,5 +141,13 @@ app.listen(PORT, HOST, () => {
     initAlertState().catch(e => console.warn('[StockAlert Init]', e.message));
   } catch (e) {
     // sessizce geç
+  }
+
+  // Zamanlanmış görevleri (Her gün 18:00 otomatik akşam raporu) başlat
+  try {
+    const { initScheduler } = require('./services/schedulerService');
+    initScheduler();
+  } catch (e) {
+    console.warn('[Scheduler Init]', e.message);
   }
 });
