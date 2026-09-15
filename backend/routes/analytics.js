@@ -7,6 +7,7 @@
 const express = require('express');
 const router  = express.Router();
 const supabase = require('../supabase');
+const { getPrice, attachPricesToProducts } = require('../services/productPriceService');
 
 // ── GET /api/analytics/summary ────────────────────────────────────────────────
 // stock_transactions geçmişindeki 'out' (tüketim) kayıtlarını çeker.
@@ -57,7 +58,18 @@ router.get('/summary', async (req, res) => {
       txErr = retry.error;
     }
     if (txErr) throw txErr;
-    transactions = txData || [];
+    transactions = (txData || []).map(t => {
+      let uPrice = (t.products?.unit_price != null && !isNaN(parseFloat(t.products.unit_price)) && parseFloat(t.products.unit_price) > 0)
+        ? parseFloat(t.products.unit_price)
+        : getPrice(t.product_id, t.products?.name);
+      return {
+        ...t,
+        products: t.products ? {
+          ...t.products,
+          unit_price: uPrice
+        } : t.products
+      };
+    });
 
     // 2. Tüm ürün listesini getir (ürün trend grafiği dropdown'ı için)
     let allProducts = [];
@@ -75,7 +87,7 @@ router.get('/summary', async (req, res) => {
       prodErr = retryProd.error;
     }
     if (prodErr) throw prodErr;
-    allProducts = prodData || [];
+    allProducts = attachPricesToProducts(prodData || []);
 
     // Birim fiyat verisi var mı kontrol et (ürün unit_price veya işlem unit_price)
     const hasPriceData = (transactions || []).some(

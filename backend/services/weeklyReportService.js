@@ -8,6 +8,7 @@
 
 const supabase = require('../supabase');
 const { sendTelegramMessage } = require('./telegramService');
+const { getPrice } = require('./productPriceService');
 
 /**
  * Türkiye (Europe/Istanbul) saat diliminde bugünün YYYY-MM-DD tarihini döner.
@@ -149,7 +150,7 @@ async function generateWeeklyReportData(options = {}) {
     const unit = tx.products?.unit || 'adet';
     const unitPrice = (tx.products?.unit_price != null && !isNaN(parseFloat(tx.products.unit_price)) && parseFloat(tx.products.unit_price) > 0)
       ? parseFloat(tx.products.unit_price)
-      : null;
+      : getPrice(pid, name);
 
     if (!consumptionMap[pid]) {
       consumptionMap[pid] = {

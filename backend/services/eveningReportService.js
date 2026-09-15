@@ -7,6 +7,7 @@
 
 const supabase = require('../supabase');
 const { sendTelegramMessage } = require('./telegramService');
+const { getPrice } = require('./productPriceService');
 
 const GUN_ADLARI = {
   1: 'Pazartesi', 2: 'Salı', 3: 'Çarşamba',
@@ -202,7 +203,7 @@ async function generateEveningReportData(date) {
     const critThreshold = parseFloat(row.products?.critical_threshold || 0);
     const uPrice = (row.products?.unit_price != null && !isNaN(parseFloat(row.products.unit_price)) && parseFloat(row.products.unit_price) > 0)
       ? parseFloat(row.products.unit_price)
-      : null;
+      : getPrice(row.product_id, row.products?.name);
     stockMap[row.product_id] = q;
     allProductsStock[row.product_id] = {
       product_id:         row.product_id,
@@ -229,7 +230,7 @@ async function generateEveningReportData(date) {
     const pCrit = parseFloat(p?.critical_threshold || 0);
     const pPrice = (p?.unit_price != null && !isNaN(parseFloat(p.unit_price)) && parseFloat(p.unit_price) > 0)
       ? parseFloat(p.unit_price)
-      : null;
+      : getPrice(pid, pName);
 
     if (tx.source_type === 'meal_plan' && tx.source_id && mealPlansMap[tx.source_id]) {
       mealPlansMap[tx.source_id].items.push({

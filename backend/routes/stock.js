@@ -12,6 +12,7 @@ const express  = require('express');
 const router   = express.Router();
 const supabase = require('../supabase');
 const { checkStockAlerts } = require('../services/stockAlertService');
+const { getPrice, setPrice, parseNumericPrice } = require('../services/productPriceService');
 
 // ─── Yardımcı Fonksiyonlar: Metin Normalizasyonu ve Akıllı Eşleştirme ──────
 function escapeRegex(string) {
@@ -132,243 +133,345 @@ function findMatchingProduct(targetName, products) {
 //   "birim_fiyat": 45.00,
 //   "source_type": "invoice"
 // }
-router.post('/in', async (req, res) => {
-  try {
-    const {
-      product_id,
-      product_name,
-      name,
-      quantity,
-      unit,
-      category,
-      critical_threshold,
-      protein_per_unit,
-      unit_price,
-      birim_fiyat,
-      transaction_date,
-      source_type = 'manual',
-      source_id   = null
-    } = req.body;
+// ─── POST /api/stock/in ──────────────────────────────────────────────────────
+// Hem tek bir ürün nesnesini hem de dizi halindeki toplu fatura kalemlerini kabul eder.
+//
+// Desteklenen Alanlar (Esnek Eşleştirme):
+// - İsim: product_name, name, urun_adi, urunAdi, ürün_adı
+// - Miktar: quantity, miktar, adet, qty
+// - Birim: unit, birim
+// - Birim Fiyat: birim_fiyat, unit_price, fiyat, price
+// - Toplam Tutar: toplam_tutar, total_amount, tutar (Birim fiyat yoksa toplam_tutar / miktar hesabı yapılır)
+//
+// Örnek Body:
+// [
+//   { "urun_adi": "Dana Kıyma", "miktar": 10, "birim": "kg", "birim_fiyat": 450.00 },
+//   { "urun_adi": "Domates", "miktar": 20, "birim": "kg", "toplam_tutar": 650.00 }
+// ]
 
-    const searchedName = (product_name || name || '').toString().trim();
+async function processStockInItem(itemData) {
+  const searchedName = (
+    itemData.product_name ||
+    itemData.name ||
+    itemData.urun_adi ||
+    itemData.urunAdi ||
+    itemData.ürün_adı ||
+    itemData.item_name ||
+    itemData.title ||
+    ''
+  ).toString().trim();
 
-    // ── Validasyon ────────────────────────────────────────────────────────────
-    if ((!product_id && !searchedName) || quantity == null) {
-      return res.status(400).json({
-        success: false,
-        error: 'product_id veya product_name (ürün adı) ile quantity alanları zorunludur.'
-      });
+  const productId = itemData.product_id || itemData.id || null;
+  const rawQty = itemData.quantity ?? itemData.miktar ?? itemData.adet ?? itemData.qty ?? itemData.amount;
+  const unit = (itemData.unit || itemData.birim || itemData.olcu_birimi || 'kg').toString().trim().slice(0, 20);
+  const category = (itemData.category || itemData.kategori || 'genel').toString().trim().slice(0, 80);
+  const critical_threshold = itemData.critical_threshold ?? itemData.kritik_esik ?? null;
+  const protein_per_unit = itemData.protein_per_unit ?? itemData.protein ?? null;
+  const transaction_date = itemData.transaction_date || itemData.tarih || new Date().toISOString().split('T')[0];
+
+  let resolvedSourceType = (itemData.source_type || itemData.kaynak || itemData.source || 'invoice').toString().toLowerCase().trim();
+  if (resolvedSourceType === 'fatura') resolvedSourceType = 'invoice';
+  if (resolvedSourceType === 'ses' || resolvedSourceType === 'sesli') resolvedSourceType = 'voice';
+  if (!['manual', 'invoice', 'voice', 'n8n'].includes(resolvedSourceType)) {
+    resolvedSourceType = 'invoice';
+  }
+
+  const source_id = itemData.source_id || null;
+
+  // 1. Validasyon
+  if (!productId && !searchedName) {
+    throw new Error('Ürün adı (urun_adi / product_name) veya product_id zorunludur.');
+  }
+
+  const qty = parseNumericPrice(rawQty);
+  if (qty === null || qty <= 0) {
+    throw new Error(`Geçersiz miktar: "${rawQty}". Miktar sıfırdan büyük bir sayı olmalıdır.`);
+  }
+
+  // 2. Fiyat Tespiti ve Gerekirse Toplam Tutardan Hesaplama
+  const rawUnitPrice = (
+    itemData.birim_fiyat ??
+    itemData.unit_price ??
+    itemData.fiyat ??
+    itemData.price ??
+    itemData.birimFiyat ??
+    itemData.birim_fiyati
+  );
+  const rawTotalAmount = (
+    itemData.toplam_tutar ??
+    itemData.toplam_fiyat ??
+    itemData.total_amount ??
+    itemData.tutar ??
+    itemData.toplamTutar ??
+    itemData.total
+  );
+
+  let parsedIncomingPrice = parseNumericPrice(rawUnitPrice);
+  let priceCalcNote = '';
+
+  // Eğer doğrudan birim fiyat verilmemişse ancak toplam tutar verilmişse: birim_fiyat = toplam_tutar / miktar
+  if (parsedIncomingPrice === null && rawTotalAmount != null && rawTotalAmount !== '') {
+    const parsedTotal = parseNumericPrice(rawTotalAmount);
+    if (parsedTotal !== null && parsedTotal >= 0 && qty > 0) {
+      parsedIncomingPrice = Math.round((parsedTotal / qty) * 100) / 100;
+      priceCalcNote = `Toplam tutar (${parsedTotal} TL) / miktar (${qty}) formülü ile birim fiyat hesaplandı`;
     }
+  }
 
-    const qty = parseFloat(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      return res.status(400).json({
-        success: false,
-        error: 'quantity sıfırdan büyük bir sayı olmalıdır.'
-      });
+  const hasIncomingPrice = (parsedIncomingPrice !== null && parsedIncomingPrice >= 0);
+
+  // 3. Ürün Belirleme (ID ile veya Akıllı Eşleştirme / Yeni Ekleme)
+  let product = null;
+  let matchStatus = 'direct_id';
+  let isNewProduct = false;
+
+  if (productId) {
+    const { data: existingProd } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (existingProd) {
+      product = existingProd;
+      matchStatus = 'direct_id';
+      isNewProduct = false;
     }
+  }
 
-    let resolvedSourceType = (source_type || 'manual').toString().toLowerCase().trim();
-    if (resolvedSourceType === 'fatura') resolvedSourceType = 'invoice';
-    if (resolvedSourceType === 'ses' || resolvedSourceType === 'sesli') resolvedSourceType = 'voice';
+  if (!product && searchedName) {
+    const { data: allProducts, error: listErr } = await supabase
+      .from('products')
+      .select('*');
 
-    const validSources = ['manual', 'invoice', 'voice', 'n8n'];
-    if (!validSources.includes(resolvedSourceType)) {
-      resolvedSourceType = 'invoice';
-    }
+    if (listErr) throw listErr;
 
-    // Gelen birim fiyatı tespit et (birim_fiyat veya unit_price)
-    const rawPrice = (birim_fiyat !== undefined && birim_fiyat !== null && birim_fiyat !== '')
-      ? birim_fiyat
-      : unit_price;
-    const hasIncomingPrice = rawPrice !== undefined && rawPrice !== null && rawPrice !== '' && !isNaN(parseFloat(rawPrice)) && parseFloat(rawPrice) >= 0;
-    const parsedIncomingPrice = hasIncomingPrice ? parseFloat(rawPrice) : null;
+    const match = findMatchingProduct(searchedName, allProducts || []);
 
-    // ── Ürün Belirleme (ID ile veya İsim ile Eşleştirme / Yeni Ekleme) ──────────
-    let product = null;
-    let matchStatus = 'direct_id'; // 'direct_id' | 'matched' | 'created'
-    let isNewProduct = false;
-
-    if (product_id) {
-      const { data: existingProd, error: productErr } = await supabase
+    if (match && match.product) {
+      product = match.product;
+      matchStatus = 'matched';
+      isNewProduct = false;
+    } else {
+      // Eşleşme yok: Yeni ürün olarak ekle
+      const { data: maxRows } = await supabase
         .from('products')
+        .select('id')
+        .order('id', { ascending: false })
+        .limit(1);
+
+      const nextId = (maxRows && maxRows.length > 0 && maxRows[0].id) ? maxRows[0].id + 1 : 1;
+      const newCritical = critical_threshold != null && !isNaN(parseFloat(critical_threshold))
+        ? parseFloat(critical_threshold)
+        : 0;
+      const newProtein = protein_per_unit != null && !isNaN(parseFloat(protein_per_unit))
+        ? parseFloat(protein_per_unit)
+        : 0;
+
+      const insertPayload = {
+        id: nextId,
+        name: searchedName.slice(0, 150),
+        unit: unit || 'kg',
+        category: category || 'genel',
+        critical_threshold: newCritical,
+        protein_per_unit: newProtein
+      };
+
+      if (hasIncomingPrice) {
+        insertPayload.unit_price = parsedIncomingPrice;
+      }
+
+      let { data: createdProd, error: createErr } = await supabase
+        .from('products')
+        .insert([insertPayload])
         .select('*')
-        .eq('id', product_id)
         .single();
 
-      if (existingProd) {
-        product = existingProd;
-        matchStatus = 'direct_id';
-        isNewProduct = false;
-      }
-    }
-
-    // Eğer product_id verilmediyse veya bulunamadıysa isim ile eşleştir
-    if (!product && searchedName) {
-      const { data: allProducts, error: listErr } = await supabase
-        .from('products')
-        .select('*');
-
-      if (listErr) throw listErr;
-
-      const match = findMatchingProduct(searchedName, allProducts || []);
-
-      if (match && match.product) {
-        product = match.product;
-        matchStatus = 'matched';
-        isNewProduct = false;
-      } else {
-        // Eşleşme bulunamadı: Yeni ürün olarak ekle
-        // PostgreSQL sequence kayması durumunda pkey hatasını önlemek için son id'yi bulup ilerlet
-        const { data: maxRows } = await supabase
-          .from('products')
-          .select('id')
-          .order('id', { ascending: false })
-          .limit(1);
-
-        const nextId = (maxRows && maxRows.length > 0 && maxRows[0].id) ? maxRows[0].id + 1 : 1;
-
-        const newUnit = (unit || 'kg').toString().trim().slice(0, 20);
-        const newCategory = (category || 'genel').toString().trim().slice(0, 80);
-        const newCritical = critical_threshold != null && !isNaN(parseFloat(critical_threshold))
-          ? parseFloat(critical_threshold)
-          : 0;
-        const newProtein = protein_per_unit != null && !isNaN(parseFloat(protein_per_unit))
-          ? parseFloat(protein_per_unit)
-          : 0;
-
-        const insertPayload = {
-          id: nextId,
-          name: searchedName.slice(0, 150),
-          unit: newUnit,
-          category: newCategory,
-          critical_threshold: newCritical,
-          protein_per_unit: newProtein
-        };
-
-        if (hasIncomingPrice) {
-          insertPayload.unit_price = parsedIncomingPrice;
-        }
-
-        let { data: createdProd, error: createErr } = await supabase
+      if (createErr && (createErr.code === '42703' || createErr.message?.includes('unit_price'))) {
+        delete insertPayload.unit_price;
+        const retry = await supabase
           .from('products')
           .insert([insertPayload])
           .select('*')
           .single();
-
-        if (createErr && (createErr.code === '42703' || createErr.message?.includes('unit_price'))) {
-          delete insertPayload.unit_price;
-          const retry = await supabase
-            .from('products')
-            .insert([insertPayload])
-            .select('*')
-            .single();
-          createdProd = retry.data;
-          createErr = retry.error;
-        }
-
-        if (createErr) throw createErr;
-
-        product = createdProd;
-        matchStatus = 'created';
-        isNewProduct = true;
+        createdProd = retry.data;
+        createErr = retry.error;
       }
+
+      if (createErr) throw createErr;
+
+      product = createdProd;
+      matchStatus = 'created';
+      isNewProduct = true;
+    }
+  }
+
+  if (!product) {
+    throw new Error(`Belirtilen ürün (${productId || searchedName}) sistemde bulunamadı ve oluşturulamadı.`);
+  }
+
+  // 4. Stok Hareketi Ekle (trigger otomatik current_stock günceller)
+  const { data: transaction, error: txErr } = await supabase
+    .from('stock_transactions')
+    .insert([{
+      product_id: product.id,
+      transaction_type: 'in',
+      quantity:          qty,
+      source_type:       resolvedSourceType,
+      source_id,
+      transaction_date
+    }])
+    .select()
+    .single();
+
+  if (txErr) throw txErr;
+
+  // 5. Güncel Stoku Getir
+  const { data: stock } = await supabase
+    .from('current_stock')
+    .select('quantity')
+    .eq('product_id', product.id)
+    .single();
+
+  // 6. Kritik Stok Uyarısı Kontrolü
+  checkStockAlerts([product.id]).catch(err => {
+    console.error('[Stok Uyarı Hatası - stock/in]', err.message);
+  });
+
+  // 7. Fiyat Güncellemesi
+  // Kural: Fatura/girişte geçerli fiyat varsa hem yerel servise hem Supabase'e kaydet. Fiyat yoksa mevcut fiyata DOKUNMA!
+  let priceUpdated = false;
+  const previousPrice = product.unit_price ?? getPrice(product.id, product.name);
+
+  if (hasIncomingPrice) {
+    // A. Yerel fiyat servisine hemen kaydet (Supabase kolonu olmasa dahi veri asla kaybolmaz)
+    setPrice(product.id, product.name, parsedIncomingPrice);
+    product.unit_price = parsedIncomingPrice;
+    priceUpdated = true;
+
+    // B. Supabase tablosuna da kaydetmeyi dene
+    try {
+      const { error: priceErr } = await supabase
+        .from('products')
+        .update({ unit_price: parsedIncomingPrice })
+        .eq('id', product.id);
+
+      if (priceErr && priceErr.code !== '42703' && !priceErr.message?.includes('unit_price')) {
+        console.warn(`[stock/in] Supabase unit_price güncelleme uyarısı (${product.name}):`, priceErr.message);
+      }
+    } catch (pErr) {
+      console.warn(`[stock/in] Supabase fiyat hatası (${product.name}):`, pErr.message);
+    }
+  } else {
+    product.unit_price = previousPrice;
+  }
+
+  // 8. Railway Canlı Log Yazımı (Kullanıcının Railway panelinden anında görebilmesi için)
+  if (priceUpdated) {
+    console.log('======================================================================');
+    console.log(`💰 [RAILWAY LOG - FİYAT GÜNCELLENDİ]`);
+    console.log(`   Ürün: "${product.name}" (ID: ${product.id})`);
+    console.log(`   Önceki Fiyat: ${previousPrice != null ? previousPrice + ' TL' : 'Kayıtlı fiyat yok'}`);
+    console.log(`   Yeni Birim Fiyat: ${parsedIncomingPrice.toFixed(2)} TL`);
+    console.log(`   Eklenen Miktar: +${qty} ${product.unit}`);
+    if (priceCalcNote) {
+      console.log(`   Hesaplama Notu: ${priceCalcNote}`);
+    }
+    console.log(`   Kaynak: ${resolvedSourceType}`);
+    console.log('======================================================================');
+  } else {
+    console.log(`ℹ️ [RAILWAY LOG - FİYAT DEĞİŞMEDİ] Ürün: "${product.name}" (ID: ${product.id}) | Faturada fiyat yer almadı. Mevcut Fiyat: ${previousPrice != null ? previousPrice + ' TL' : 'Kayıtlı fiyat yok'}`);
+  }
+
+  let message = '';
+  if (matchStatus === 'created') {
+    message = `'${searchedName}' ürünü sistemde bulunamadığı için yeni ürün olarak oluşturuldu (${product.name}, ${product.unit}). ${qty} ${product.unit} stok girişi yapıldı.`;
+  } else if (matchStatus === 'matched') {
+    message = `'${searchedName}' faturadaki ürün, mevcut '${product.name}' (${product.unit}) ile eşleşti. ${qty} ${product.unit} stok girişi yapıldı.`;
+  } else {
+    message = `${product.name} için ${qty} ${product.unit} stok girişi yapıldı.`;
+  }
+
+  if (priceUpdated) {
+    message += ` (Birim fiyat: ${parsedIncomingPrice} TL güncellendi)`;
+  }
+
+  return {
+    success: true,
+    message,
+    match_status: matchStatus,
+    is_new_product: isNewProduct,
+    price_updated: priceUpdated,
+    price_calc_note: priceCalcNote || null,
+    product: {
+      id: product.id,
+      name: product.name,
+      unit: product.unit,
+      category: product.category,
+      unit_price: product.unit_price ?? null
+    },
+    searched_name: searchedName || null,
+    transaction,
+    current_stock: stock?.quantity ?? null
+  };
+}
+
+router.post('/in', async (req, res) => {
+  try {
+    const rawItems = Array.isArray(req.body)
+      ? req.body
+      : (Array.isArray(req.body?.items) ? req.body.items : (Array.isArray(req.body?.products) ? req.body.products : [req.body]));
+
+    if (!rawItems || rawItems.length === 0) {
+      return res.status(400).json({ success: false, error: 'İşlenecek stok verisi bulunamadı.' });
     }
 
-    if (!product) {
-      return res.status(404).json({
-        success: false,
-        error: `Belirtilen ürün (${product_id || searchedName}) bulunamadı ve oluşturulamadı.`
-      });
-    }
+    const results = [];
+    const updatedPrices = [];
+    const unchangedPrices = [];
 
-    // ── Stok hareketi ekle ───────────────────────────────────────────────────
-    // Trigger (trg_update_stock) otomatik olarak current_stock'u günceller
-    const { data: transaction, error: txErr } = await supabase
-      .from('stock_transactions')
-      .insert([{
-        product_id: product.id,
-        transaction_type: 'in',
-        quantity:          qty,
-        source_type:       resolvedSourceType,
-        source_id,
-        transaction_date:  transaction_date || new Date().toISOString().split('T')[0]
-      }])
-      .select()
-      .single();
-
-    if (txErr) throw txErr;
-
-    // ── Güncel stoku getir (trigger sonrası) ─────────────────────────────────
-    const { data: stock } = await supabase
-      .from('current_stock')
-      .select('quantity')
-      .eq('product_id', product.id)
-      .single();
-
-    // ── Kritik stok kontrolü ve Telegram uyarısı ─────────────────────────────
-    // Fatura veya stok girişi sonrası stok eşiğin üstüne çıktıysa uyarı durumunu sıfırlar
-    checkStockAlerts([product.id]).catch(err => {
-      console.error('[Stok Uyarı Hatası - stock/in]', err.message);
-    });
-
-    // ── Fiyat Güncellemesi (Yalnızca faturada/girişte geçerli birim fiyat varsa) ──
-    // Kural: Fiyat gelmezse mevcut fiyata DOKUNULMAZ.
-    let priceUpdated = false;
-    if (!isNewProduct && hasIncomingPrice) {
+    for (const item of rawItems) {
       try {
-        const { error: priceErr } = await supabase
-          .from('products')
-          .update({ unit_price: parsedIncomingPrice })
-          .eq('id', product.id);
-
-        if (!priceErr) {
-          product.unit_price = parsedIncomingPrice;
-          priceUpdated = true;
+        const itemResult = await processStockInItem(item);
+        results.push(itemResult);
+        if (itemResult.price_updated) {
+          updatedPrices.push(`${itemResult.product.name} (${itemResult.product.unit_price} TL)`);
         } else {
-          console.warn('[stock/in] Birim fiyat güncelleme uyarısı:', priceErr.message);
+          unchangedPrices.push(itemResult.product?.name || item.product_name || item.name || item.urun_adi);
         }
-      } catch (pErr) {
-        console.warn('[stock/in] Fiyat güncelleme hatası:', pErr.message);
+      } catch (err) {
+        console.error('[stock/in] Satır işleme hatası:', err.message, item);
+        results.push({
+          success: false,
+          error: err.message,
+          raw_item: item
+        });
       }
-    } else if (isNewProduct && hasIncomingPrice) {
-      product.unit_price = parsedIncomingPrice;
-      priceUpdated = true;
     }
 
-    // ── Yanıt mesajı ─────────────────────────────────────────────────────────
-    let message = '';
-    if (matchStatus === 'created') {
-      message = `'${searchedName}' ürünü sistemde bulunamadığı için yeni ürün olarak oluşturuldu (${product.name}, ${product.unit}). ${qty} ${product.unit} stok girişi yapıldı.`;
-    } else if (matchStatus === 'matched') {
-      message = `'${searchedName}' faturadaki ürün, mevcut '${product.name}' (${product.unit}) ile eşleşti. ${qty} ${product.unit} stok girişi yapıldı.`;
-    } else {
-      message = `${product.name} için ${qty} ${product.unit} stok girişi yapıldı.`;
+    if (rawItems.length > 1) {
+      console.log(`📦 [FATURA BATCH TAMAMLANDI] Toplam ${rawItems.length} kalem işlendi.`);
+      console.log(`   - Fiyatı Güncellenenler (${updatedPrices.length}): ${updatedPrices.join(', ') || 'Yok'}`);
+      console.log(`   - Fiyatı Değişmeyenler (${unchangedPrices.length}): ${unchangedPrices.join(', ') || 'Yok'}`);
     }
 
-    if (priceUpdated) {
-      message += ` (Birim fiyat: ${parsedIncomingPrice} TL güncellendi)`;
+    // Tekli çağrı yapılmışsa ve gelen gövde dizi değilse geriye tek nesne dön
+    if (rawItems.length === 1 && !Array.isArray(req.body) && !req.body.items && !req.body.products) {
+      const single = results[0];
+      if (!single.success) {
+        return res.status(400).json(single);
+      }
+      return res.status(201).json(single);
     }
 
     res.status(201).json({
       success: true,
-      message,
-      match_status: matchStatus,
-      is_new_product: isNewProduct,
-      price_updated: priceUpdated,
-      product: {
-        id: product.id,
-        name: product.name,
-        unit: product.unit,
-        category: product.category,
-        unit_price: product.unit_price ?? null
-      },
-      searched_name: searchedName || null,
-      transaction,
-      current_stock: stock?.quantity ?? null
+      processed_count: results.length,
+      updated_prices_count: updatedPrices.length,
+      results
     });
-
   } catch (err) {
+    console.error('[stock/in] Genel hata:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

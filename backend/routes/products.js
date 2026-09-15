@@ -9,6 +9,7 @@
 const express = require('express');
 const router  = express.Router();
 const supabase = require('../supabase');
+const { getPrice, setPrice, attachPricesToProducts, parseNumericPrice } = require('../services/productPriceService');
 
 // Ürün nesnesine güncel stok bilgisini ekleyen yardımcı fonksiyon
 function formatProductWithStock(p) {
@@ -45,7 +46,8 @@ router.get('/', async (req, res) => {
     const { data, error } = await query;
     if (error) throw error;
 
-    const formatted = (data || []).map(formatProductWithStock);
+    const withStock = (data || []).map(formatProductWithStock);
+    const formatted = attachPricesToProducts(withStock);
 
     res.json({ success: true, count: formatted.length, data: formatted });
   } catch (err) {
@@ -65,7 +67,8 @@ router.get('/:id', async (req, res) => {
     if (error) throw error;
     if (!data) return res.status(404).json({ success: false, error: 'Ürün bulunamadı.' });
 
-    res.json({ success: true, data: formatProductWithStock(data) });
+    const formatted = attachPricesToProducts([formatProductWithStock(data)])[0];
+    res.json({ success: true, data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -93,11 +96,9 @@ router.post('/', async (req, res) => {
       protein_per_unit: (protein_per_unit != null && protein_per_unit !== '') ? parseFloat(protein_per_unit) : null
     };
 
-    if (unit_price !== undefined && unit_price !== '' && unit_price !== null) {
-      const parsedPrice = parseFloat(unit_price);
-      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
-        insertData.unit_price = parsedPrice;
-      }
+    const parsedPrice = parseNumericPrice(unit_price);
+    if (parsedPrice !== null) {
+      insertData.unit_price = parsedPrice;
     }
 
     let { data, error } = await supabase
@@ -118,6 +119,11 @@ router.post('/', async (req, res) => {
     }
 
     if (error) throw error;
+
+    if (data && parsedPrice !== null) {
+      setPrice(data.id, data.name, parsedPrice);
+      data.unit_price = parsedPrice;
+    }
 
     res.status(201).json({ success: true, data });
   } catch (err) {
@@ -153,10 +159,10 @@ router.put('/:id', async (req, res) => {
         : null
     };
 
+    let parsedPrice = null;
     if (unit_price !== undefined) {
-      updateData.unit_price = (unit_price !== '' && unit_price !== null && !isNaN(parseFloat(unit_price)))
-        ? parseFloat(unit_price)
-        : null;
+      parsedPrice = parseNumericPrice(unit_price);
+      updateData.unit_price = parsedPrice;
     }
 
     let { data, error } = await supabase
@@ -183,7 +189,13 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Güncellenecek ürün bulunamadı.' });
     }
 
-    res.json({ success: true, message: 'Ürün başarıyla güncellendi.', data: formatProductWithStock(data) });
+    if (unit_price !== undefined) {
+      setPrice(id, updateData.name, parsedPrice);
+      data.unit_price = parsedPrice;
+    }
+
+    const formatted = attachPricesToProducts([formatProductWithStock(data)])[0];
+    res.json({ success: true, message: 'Ürün başarıyla güncellendi.', data: formatted });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
