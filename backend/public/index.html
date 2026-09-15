@@ -529,14 +529,13 @@
             <table class="manage-table">
               <thead>
                 <tr>
-                  <th style="min-width: 140px;">Ürün Adı</th>
-                  <th style="width: 55px;">Birim</th>
-                  <th style="width: 105px;">Kategori</th>
-                  <th class="text-right" style="width: 95px;">Birim Fiyat</th>
-                  <th class="text-right" style="width: 90px;">Kritik Eşik</th>
-                  <th class="text-right" style="width: 95px;">Güncel Stok</th>
-                  <th class="text-center" style="width: 80px;">Durum</th>
-                  <th class="text-center" style="width: 70px;">İşlem</th>
+                  <th>Ürün Adı</th>
+                  <th>Birim</th>
+                  <th>Kategori</th>
+                  <th class="text-right">Kritik Eşik</th>
+                  <th class="text-right">Güncel Stok</th>
+                  <th class="text-center">Durum</th>
+                  <th class="text-center">İşlem</th>
                 </tr>
               </thead>
               <tbody id="products-tbody"></tbody>
@@ -856,10 +855,11 @@
             <h3 class="card-title" style="font-size: 1rem;">📉 Ürün Bazlı Tüketim Trendi</h3>
             <p class="card-description" id="prod-trend-subtitle">Seçilen malzemenin aylık tüketim grafiği</p>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <label for="analysis-product-select" style="font-size: 0.8rem; color: var(--text-muted);">Ürün:</label>
             <select id="analysis-product-select" class="mf-input mf-select" style="width: auto; min-width: 220px; padding: 6px 12px; height: 38px;" onchange="onAnalysisProductChange()">
             </select>
+            <span id="prod-trend-price-badge" class="cat-badge hidden" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.78rem; padding: 4px 10px; text-transform: none; letter-spacing: 0;"></span>
           </div>
         </div>
         <div class="chart-container" style="position: relative; height: 300px; width: 100%;">

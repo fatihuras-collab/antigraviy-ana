@@ -761,9 +761,6 @@ async function loadProducts() {
       const isCritical = thresh != null ? (stockQty <= thresh) : false;
 
       const formattedStock = `${formatStockQuantity(stockQty)} ${escapeHtml(p.unit || '')}`;
-      const formattedPrice = (p.unit_price != null && p.unit_price !== '') 
-        ? `₺${Number(p.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-        : '<span style="color:var(--text-muted)">—</span>';
       const statusBadge = isCritical
         ? `<span class="badge badge-danger"><span class="badge-dot"></span>Kritik</span>`
         : `<span class="badge badge-success"><span class="badge-dot"></span>Normal</span>`;
@@ -776,7 +773,6 @@ async function loadProducts() {
         <td><span class="item-name">${escapeHtml(p.name)}</span></td>
         <td>${escapeHtml(p.unit || '—')}</td>
         <td>${p.category ? `<span class="cat-badge">${escapeHtml(p.category)}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td class="text-right font-medium">${formattedPrice}</td>
         <td class="text-right">${p.critical_threshold != null ? `${formatStockQuantity(p.critical_threshold)} ${escapeHtml(p.unit || '')}` : '—'}</td>
         <td class="text-right font-medium"><span class="${isCritical ? 'text-danger' : ''}">${formattedStock}</span></td>
         <td class="text-center">${statusBadge}</td>
@@ -2010,7 +2006,9 @@ function initAnalysisProductSelect(prods, txs) {
 
   select.innerHTML = prods.map(p => {
     const isActive = activeProdIds.has(p.id);
-    return `<option value="${p.id}" ${p.id == _analyticsSelectedProductId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.unit || '')})${isActive ? ' •' : ''}</option>`;
+    const hasPrice = (p.unit_price != null && !isNaN(parseFloat(p.unit_price)) && parseFloat(p.unit_price) > 0);
+    const priceTag = hasPrice ? ` — ₺${Number(p.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    return `<option value="${p.id}" ${p.id == _analyticsSelectedProductId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.unit || '')}${priceTag})${isActive ? ' •' : ''}</option>`;
   }).join('');
 }
 
@@ -2376,9 +2374,28 @@ function renderProductTrendChart() {
   const prodName = selectedProd ? selectedProd.name : 'Seçilen Ürün';
   const prodUnit = selectedProd ? selectedProd.unit : '';
   const prodCategory = selectedProd ? selectedProd.category : '';
+  const prodPrice = (selectedProd?.unit_price != null && !isNaN(parseFloat(selectedProd.unit_price)) && parseFloat(selectedProd.unit_price) > 0)
+    ? parseFloat(selectedProd.unit_price)
+    : null;
 
   const subEl = document.getElementById('prod-trend-subtitle');
-  if (subEl) subEl.textContent = `"${prodName}" ürününün son ${_analyticsRange} aydaki tüketim eğrisi`;
+  const priceBadge = document.getElementById('prod-trend-price-badge');
+
+  if (priceBadge) {
+    if (prodPrice != null) {
+      priceBadge.textContent = `Birim Alış: ₺${prodPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${prodUnit}`;
+      priceBadge.classList.remove('hidden');
+    } else {
+      priceBadge.textContent = 'Birim Fiyat: Belirtilmemiş';
+      priceBadge.classList.remove('hidden');
+    }
+  }
+
+  const priceNote = prodPrice != null 
+    ? ` • Güncel Alış Fiyatı: ₺${prodPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${prodUnit}`
+    : '';
+
+  if (subEl) subEl.textContent = `"${prodName}" ürününün son ${_analyticsRange} aydaki tüketim eğrisi${priceNote}`;
 
   const values = monthList.map(m => {
     const pTxs = txs.filter(t => t.product_id == _analyticsSelectedProductId && (t.transaction_date || '').startsWith(m.key));
@@ -2412,7 +2429,15 @@ function renderProductTrendChart() {
         tooltip: {
           ...getChartDefaultOptions().plugins.tooltip,
           callbacks: {
-            label: (ctx) => ` ${prodName}: ${ctx.formattedValue} ${prodUnit}`
+            label: (ctx) => {
+              const qty = parseFloat(ctx.raw || 0);
+              let tip = ` ${prodName}: ${ctx.formattedValue} ${prodUnit}`;
+              if (prodPrice != null && qty > 0) {
+                const cost = (qty * prodPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                tip += ` (~₺${cost})`;
+              }
+              return tip;
+            }
           }
         }
       },
