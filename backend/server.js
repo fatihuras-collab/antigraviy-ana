@@ -75,6 +75,7 @@ app.use('/api/products',           require('./routes/products'));
 app.use('/api/stock',              require('./routes/stock'));
 app.use('/api/daily-consumption',  require('./routes/consumption'));
 app.use('/api/evening-report',     require('./routes/reports'));
+app.use('/api/weekly-report',      require('./routes/weeklyReport'));
 app.use('/api/meal-feedback',      require('./routes/feedback'));
 app.use('/api/recipes',            require('./routes/recipes'));
 app.use('/api/settings',           require('./routes/settings'));
@@ -122,6 +123,8 @@ app.listen(PORT, HOST, () => {
   console.log(`   Günlük tüketim      : POST /api/daily-consumption`);
   console.log(`   Akşam raporu        : GET  /api/evening-report`);
   console.log(`   Akşam raporu gönder : GET  /api/evening-report/send`);
+  console.log(`   Haftalık rapor      : GET  /api/weekly-report`);
+  console.log(`   Haftalık rapor gönd.: GET  /api/weekly-report/send`);
   console.log(`   Geri bildirim       : POST /api/meal-feedback`);
   console.log(`   Bugünün öğünleri    : GET  /api/meal-feedback/today`);
   console.log(`   Reçete listesi      : GET  /api/recipes`);

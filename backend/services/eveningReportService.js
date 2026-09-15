@@ -437,7 +437,7 @@ function formatEveningReportMessage(reportData) {
       .join(', ');
     criticalLine = `⚠️ Kritik seviyedekiler: ${listStr}`;
   } else {
-    criticalLine = 'Kritik seviyede ürün yok, her şey yolunda.';
+    criticalLine = 'Kritik ürün yok, her şey yolunda.';
   }
 
   return [
