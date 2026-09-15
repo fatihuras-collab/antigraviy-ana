@@ -106,14 +106,35 @@ router.post('/', async (req, res) => {
   }
 });
 
+const { sendTelegramMessage } = require('../services/telegramService');
+
 // ─── POST /api/settings/reset-system ──────────────────────────────────────────
-// Sistemi gerçek kullanıma hazırlar:
-// 1. stock_transactions tablosundaki tüm kayıtları siler (fatura ve tüketim geçmişi).
-// 2. current_stock tablosundaki tüm miktarları 0 yapar.
-// 3. meal_feedback ve meal_plans tablolarındaki test kayıtlarını siler.
-// DOKUNULMAZ: products (ürün tanımları), recipes (reçeteler), monthly_menu (menü), app_settings
-router.post('/reset-system', async (_req, res) => {
+// Sistemi gerçek kullanıma hazırlar (Çok Korumalı & Şifreli):
+// 1. Şifre kontrolü: process.env.RESET_PASSWORD kontrol edilir, hatalıysa reddedilir.
+// 2. stock_transactions tablosundaki tüm kayıtları siler (fatura ve tüketim geçmişi).
+// 3. current_stock tablosundaki tüm miktarları 0 yapar.
+// 4. meal_feedback ve meal_plans tablolarındaki test kayıtlarını siler.
+// 5. Telegram'a sıfırlama bildirimi gönderir: "⚠️ Stok verileri sıfırlandı — [tarih saat]"
+// KESİNLİKLE DOKUNULMAZ: products (ürün tanımları ve unit_price), recipes (reçeteler), monthly_menu (menü), app_settings
+router.post('/reset-system', async (req, res) => {
   try {
+    const { password } = req.body || {};
+
+    const configuredPassword = (process.env.RESET_PASSWORD || '').toString().trim();
+    if (!configuredPassword) {
+      return res.status(500).json({
+        success: false,
+        error: 'Sunucuda RESET_PASSWORD environment değişkeni tanımlanmamış. Güvenlik nedeniyle sıfırlama engellendi.'
+      });
+    }
+
+    if (!password || password.toString().trim() !== configuredPassword) {
+      return res.status(403).json({
+        success: false,
+        error: 'Şifre hatalı'
+      });
+    }
+
     // 1. stock_transactions sil
     const { error: errTrans } = await supabase
       .from('stock_transactions')
@@ -143,6 +164,7 @@ router.post('/reset-system', async (_req, res) => {
     if (errStockUpdate) throw new Error(`current_stock güncellenemedi: ${errStockUpdate.message}`);
 
     // Tüm mevcut ürünlerin current_stock kaydı olduğundan ve 0 olduğundan emin ol
+    // NOT: products tablosundaki id, name, unit, category, critical_threshold, unit_price ASLA silinmez!
     const { data: products, error: prodErr } = await supabase
       .from('products')
       .select('id');
@@ -163,6 +185,22 @@ router.post('/reset-system', async (_req, res) => {
       await clearAlertState();
     } catch (e) {
       // sessizce geç
+    }
+
+    // Telegram'a sıfırlama bildirimi gönder
+    try {
+      const dateStr = new Intl.DateTimeFormat('tr-TR', {
+        timeZone: 'Europe/Istanbul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).format(new Date());
+
+      await sendTelegramMessage(`⚠️ Stok verileri sıfırlandı — ${dateStr}`);
+    } catch (telegramErr) {
+      console.warn('[reset-system Telegram Hatası]', telegramErr.message);
     }
 
     res.json({

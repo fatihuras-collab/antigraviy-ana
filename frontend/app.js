@@ -29,7 +29,8 @@ function switchTab(tabName) {
     menu:         'panel-menu',
     manage:       'panel-manage',
     menuupload:   'panel-menuupload',
-    analysis:     'panel-analysis'
+    analysis:     'panel-analysis',
+    settings:     'panel-settings'
   };
   const tabs = {
     consumption:  'tab-consumption',
@@ -37,7 +38,8 @@ function switchTab(tabName) {
     menu:         'tab-menu',
     manage:       'tab-manage',
     menuupload:   'tab-menuupload',
-    analysis:     'tab-analysis'
+    analysis:     'tab-analysis',
+    settings:     'tab-settings'
   };
 
   Object.values(panels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
@@ -1538,14 +1540,48 @@ async function saveAgeSetting() {
   }
 }
 
-// ── Sistemi Gerçek Kullanıma Hazırla ──────────────────────────────────────────
-async function resetSystemForProduction() {
-  const confirmed = confirm('Emin misiniz? Tüm stok geçmişi silinecek, ürün listesi kalacak');
-  if (!confirmed) return;
+// ── Sistemi Gerçek Kullanıma Hazırla (Şifre Korumalı Modal) ────────────────
+function openResetConfirmModal() {
+  const modal = document.getElementById('system-reset-modal');
+  const input = document.getElementById('reset-password-input');
+  const alertEl = document.getElementById('reset-modal-alert');
+  if (alertEl) {
+    alertEl.classList.add('hidden');
+    alertEl.innerHTML = '';
+  }
+  if (input) {
+    input.value = '';
+  }
+  modal?.classList.remove('hidden');
+  setTimeout(() => input?.focus(), 100);
+}
 
-  const btn     = document.getElementById('btn-reset-system');
-  const spinner = document.getElementById('reset-system-spinner');
-  const alertEl = document.getElementById('reset-system-alert');
+function closeResetConfirmModal() {
+  const modal = document.getElementById('system-reset-modal');
+  const input = document.getElementById('reset-password-input');
+  const alertEl = document.getElementById('reset-modal-alert');
+  if (alertEl) {
+    alertEl.classList.add('hidden');
+    alertEl.innerHTML = '';
+  }
+  if (input) {
+    input.value = '';
+  }
+  modal?.classList.add('hidden');
+}
+
+async function executeSystemReset() {
+  const input = document.getElementById('reset-password-input');
+  const btn = document.getElementById('btn-execute-reset');
+  const spinner = document.getElementById('execute-reset-spinner');
+  const alertEl = document.getElementById('reset-modal-alert');
+
+  const password = input?.value?.trim();
+  if (!password) {
+    showManageAlert(alertEl, 'Lütfen 4 haneli şifreyi girin.', 'err');
+    input?.focus();
+    return;
+  }
 
   if (btn) btn.disabled = true;
   spinner?.classList.remove('hidden');
@@ -1554,25 +1590,35 @@ async function resetSystemForProduction() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/settings/reset-system`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
     });
 
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      showManageAlert(alertEl, data.error || 'Sıfırlama işlemi sırasında bir hata oluştu.', 'err');
+      showManageAlert(alertEl, data.error || 'şifre hatalı', 'err');
+      if (input) {
+        input.value = '';
+        input.focus();
+      }
       return;
     }
 
-    showManageAlert(alertEl, data.message || 'Sistem gerçek kullanıma hazırlandı! Güncel stoklar sıfırlandı.', 'ok');
+    showManageAlert(alertEl, data.message || 'Sistem sıfırlandı!', 'ok');
 
-    // Ürün listesini hemen yeniden yükle (tüm ürünlerin stoğu 0 olarak güncellenir)
+    // Ürün listesini ve diğer verileri güncelle
     await loadProducts();
-
-    // Varsa öğün değerlendirme ve menü önbelleklerini tazele
     if (typeof loadFeedbackMeals === 'function') {
       try { await loadFeedbackMeals(); } catch (_) {}
     }
+
+    setTimeout(() => {
+      closeResetConfirmModal();
+      alert('✅ Sistem gerçek kullanıma hazırlandı! Stok geçmişi sıfırlandı.');
+      switchTab('consumption');
+    }, 1200);
+
   } catch (err) {
     showManageAlert(alertEl, 'Bağlantı hatası: ' + err.message, 'err');
   } finally {
