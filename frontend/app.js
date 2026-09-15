@@ -23,14 +23,19 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function switchTab(tabName) {
+  if (tabName === 'settings') {
+    switchTab('menu');
+    toggleMenuSettings(true);
+    return;
+  }
+
   const panels = {
     consumption:  'panel-consumption',
     feedback:     'panel-feedback',
     menu:         'panel-menu',
     manage:       'panel-manage',
     menuupload:   'panel-menuupload',
-    analysis:     'panel-analysis',
-    settings:     'panel-settings'
+    analysis:     'panel-analysis'
   };
   const tabs = {
     consumption:  'tab-consumption',
@@ -38,8 +43,7 @@ function switchTab(tabName) {
     menu:         'tab-menu',
     manage:       'tab-manage',
     menuupload:   'tab-menuupload',
-    analysis:     'tab-analysis',
-    settings:     'tab-settings'
+    analysis:     'tab-analysis'
   };
 
   Object.values(panels).forEach(id => document.getElementById(id)?.classList.add('hidden'));
@@ -560,6 +564,29 @@ function jumpToEvaluation(week, day) {
   switchTab('feedback');
   selectFeedbackWeek(week);
   selectFeedbackDay(day);
+}
+
+function toggleMenuSettings(forceState) {
+  const section = document.getElementById('menu-settings-section');
+  const btn = document.getElementById('btn-toggle-menu-settings');
+  const label = document.getElementById('menu-settings-btn-label');
+  if (!section) return;
+
+  const isCurrentlyHidden = section.classList.contains('hidden');
+  const makeVisible = forceState !== undefined ? forceState : isCurrentlyHidden;
+
+  if (makeVisible) {
+    section.classList.remove('hidden');
+    btn?.classList.add('tab-active');
+    if (label) label.textContent = '✕ Kapat';
+    setTimeout(() => {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  } else {
+    section.classList.add('hidden');
+    btn?.classList.remove('tab-active');
+    if (label) label.textContent = 'Ayarlar';
+  }
 }
 
 let toastTimer = null;

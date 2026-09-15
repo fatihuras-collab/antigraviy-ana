@@ -105,13 +105,6 @@
         </svg>
         Analiz
       </button>
-      <button id="tab-settings" class="tab-btn" role="tab" aria-selected="false" onclick="switchTab('settings')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        Ayarlar
-      </button>
     </nav>
 
     <!-- ════ PANEL 1: TÜKETİM GİRİŞİ ════ -->
@@ -349,19 +342,29 @@
     <!-- ════ PANEL: AYLIK YEMEK LİSTESİ ════ -->
     <main id="panel-menu" class="main-content hidden">
       <section class="card">
-        <div class="card-header" style="margin-bottom: 16px;">
-          <div class="card-icon-bubble card-icon-green">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
+        <div class="card-header" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; gap: 16px; align-items: center;">
+            <div class="card-icon-bubble card-icon-green">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+              </svg>
+            </div>
+            <div>
+              <h2 class="card-title">Anaokulu | Bir Aylık Yemek Listesi</h2>
+              <p class="card-description"><span class="setting-age-group">2-6 yaş grubu</span> • 20 okul günü • Kahvaltı, öğle yemeği ve ikindi ara öğünü</p>
+            </div>
+          </div>
+          <!-- ⚙️ Dişli İşareti: Ayarlar Butonu -->
+          <button type="button" class="btn btn-outline-sm" id="btn-toggle-menu-settings" onclick="toggleMenuSettings()" title="Sistem Ayarları & Sıfırlama" style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; font-size: 0.82rem; border-color: rgba(255,255,255,0.18); color: #cbd5e1; border-radius: var(--radius-sm); cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
-          </div>
-          <div>
-            <h2 class="card-title">Anaokulu | Bir Aylık Yemek Listesi</h2>
-            <p class="card-description"><span class="setting-age-group">2-6 yaş grubu</span> • 20 okul günü • Kahvaltı, öğle yemeği ve ikindi ara öğünü</p>
-          </div>
+            <span id="menu-settings-btn-label">Ayarlar</span>
+          </button>
         </div>
 
         <!-- Hafta Sekmeleri (1. Hafta, 2. Hafta, 3. Hafta, 4. Hafta) -->
@@ -396,6 +399,55 @@
           <p>• <strong>Meyve ve sebzeler</strong> mevsime göre değiştirilebilir. Su her öğünde ve gün boyunca sunulmalıdır.</p>
           <p>• <strong>Balık</strong> tamamen kılçıksız, meyve ve sebzeler yaşa uygun büyüklükte hazırlanmalıdır.</p>
           <p>• Bu liste örnek taslaktır. Porsiyonlar ve alerjilere yönelik değişiklikler, çocukların ihtiyaçlarına göre okulun diyetisyeniyle netleştirilmelidir.</p>
+        </div>
+
+        <!-- ⚙️ SİSTEM AYARLARI VE SIFIRLAMA BÖLÜMÜ (Aylık Menü İçerisinde) -->
+        <div id="menu-settings-section" class="hidden" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.08); animation: slideUp 0.3s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+              <span>⚙️</span> Sistem Ayarları &amp; Araçlar
+            </h3>
+            <button type="button" class="btn btn-outline-sm" onclick="toggleMenuSettings(false)" style="padding: 4px 10px; font-size: 0.76rem;">✕ Kapat</button>
+          </div>
+
+          <!-- Sistem Parametreleri Kartı -->
+          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius-md); padding: 18px 20px; margin-bottom: 16px;">
+            <h4 style="font-size: 0.92rem; margin-bottom: 12px; color: #e2e8f0; font-weight: 700;">📌 Sistem Bilgileri</h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; font-size: 0.84rem; color: #94a3b8;">
+              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                Hedef Yaş Grubu: <strong style="color: #60a5fa; display: block; margin-top: 2px;">2-6 Yaş Grubu</strong>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                Zaman Dilimi: <strong style="color: #f1f5f9; display: block; margin-top: 2px;">Europe/Istanbul (TSİ)</strong>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                Otomatik Akşam Raporu: <strong style="color: #34d399; display: block; margin-top: 2px;">Her Gün 18:00 (Telegram)</strong>
+              </div>
+              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
+                Otomatik Haftalık Rapor: <strong style="color: #a78bfa; display: block; margin-top: 2px;">Her Cuma 12:00 (Telegram)</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⚠️ TEHLİKELİ BÖLGE: KORUMALI SİSTEM SIFIRLAMA -->
+          <div style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 20px 22px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 1.35rem;">⚠️</span>
+              <div>
+                <h3 style="color: #fca5a5; font-size: 1.05rem; margin: 0; font-weight: 700;">Tehlikeli Bölge: Stok ve Sistem Sıfırlama</h3>
+                <span class="badge badge-danger" style="font-size: 0.68rem; padding: 2px 7px; margin-top: 4px;">Şifre Korumalı &bull; Geri Alınamaz</span>
+              </div>
+            </div>
+            <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.6; margin: 12px 0 18px;">
+              Tüm stok hareketlerini (fatura ve tüketim geçmişi), test öğün planlarını ve değerlendirmeleri silerek güncel ürün stoklarını <strong>0</strong> yapar.
+              <br>
+              <span style="color: #cbd5e1;">✅ <strong>Ürün tanımları, reçeteler, aylık menü ve birim alış fiyatlarına kesinlikle dokunulmaz.</strong></span>
+            </p>
+
+            <button type="button" class="btn btn-reset-system" id="btn-open-reset-modal" onclick="openResetConfirmModal()" style="display: inline-flex; width: auto; padding: 10px 22px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; font-weight: 600;">
+              <span>🧹 Sistemi Gerçek Kullanıma Hazırla</span>
+            </button>
+          </div>
         </div>
       </section>
     </main>
@@ -882,61 +934,6 @@
         </section>
 
       </div>
-    </main>
-
-    <!-- ════ PANEL 7: AYARLAR ════ -->
-    <main id="panel-settings" class="main-content hidden" role="tabpanel">
-      <section class="manage-section">
-        <div class="manage-section-header">
-          <div>
-            <h2 class="manage-section-title">
-              <span class="manage-section-icon">⚙️</span> Sistem Ayarları
-            </h2>
-            <p class="manage-section-desc">Uygulama parametreleri ve yönetimsel araçlar</p>
-          </div>
-        </div>
-
-        <!-- Sistem Parametreleri Kartı -->
-        <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius-md); padding: 18px 20px;">
-          <h4 style="font-size: 0.95rem; margin-bottom: 12px; color: #e2e8f0; font-weight: 700;">📌 Sistem Bilgileri</h4>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; font-size: 0.84rem; color: #94a3b8;">
-            <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-              Hedef Yaş Grubu: <strong style="color: #60a5fa; display: block; margin-top: 2px;">2-6 Yaş Grubu</strong>
-            </div>
-            <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-              Zaman Dilimi: <strong style="color: #f1f5f9; display: block; margin-top: 2px;">Europe/Istanbul (TSİ)</strong>
-            </div>
-            <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-              Otomatik Akşam Raporu: <strong style="color: #34d399; display: block; margin-top: 2px;">Her Gün 18:00 (Telegram)</strong>
-            </div>
-            <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-              Otomatik Haftalık Rapor: <strong style="color: #a78bfa; display: block; margin-top: 2px;">Her Cuma 12:00 (Telegram)</strong>
-            </div>
-          </div>
-        </div>
-
-        <div class="manage-divider"></div>
-
-        <!-- ⚠️ TEHLİKELİ BÖLGE: KORUMALI SİSTEM SIFIRLAMA -->
-        <div style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 22px 24px;">
-          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-            <span style="font-size: 1.35rem;">⚠️</span>
-            <div>
-              <h3 style="color: #fca5a5; font-size: 1.05rem; margin: 0; font-weight: 700;">Tehlikeli Bölge: Stok ve Sistem Sıfırlama</h3>
-              <span class="badge badge-danger" style="font-size: 0.68rem; padding: 2px 7px; margin-top: 4px;">Şifre Korumalı &bull; Geri Alınamaz</span>
-            </div>
-          </div>
-          <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.6; margin: 12px 0 18px;">
-            Tüm stok hareketlerini (fatura ve tüketim geçmişi), test öğün planlarını ve değerlendirmeleri silerek güncel ürün stoklarını <strong>0</strong> yapar.
-            <br>
-            <span style="color: #cbd5e1;">✅ <strong>Ürün tanımları, reçeteler, aylık menü ve birim alış fiyatlarına kesinlikle dokunulmaz.</strong></span>
-          </p>
-
-          <button type="button" class="btn btn-reset-system" id="btn-open-reset-modal" onclick="openResetConfirmModal()" style="display: inline-flex; width: auto; padding: 10px 22px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; font-weight: 600;">
-            <span>🧹 Sistemi Gerçek Kullanıma Hazırla</span>
-          </button>
-        </div>
-      </section>
     </main>
 
     <!-- Alt Bilgi -->
