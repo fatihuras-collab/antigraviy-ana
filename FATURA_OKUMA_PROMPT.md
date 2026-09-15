@@ -1,65 +1,96 @@
 # 🧾 AI Fatura / İrsaliye Okuma Prompt Rehberi
 
-Bu prompt; anaokulu yemekhanesine gelen fatura veya irsaliye fotoğraflarını **Claude Vision (Claude 3.5 / 3.7 / Sonnet)**, **n8n** veya benzeri AI vision modellerine vererek **ürün adı, miktar, birim ve birim fiyatı** eksiksiz ve hatasız çıkarmak için hazırlanmıştır.
+Bu prompt; anaokulu yemekhanesine gelen fatura ve irsaliye görsellerini **Claude Vision (Claude 3.5 / 3.7 Sonnet)** veya **n8n** üzerinden okuturken **ürün adı, miktar, birim ve BİRİM FİYATI** eksiksiz ve hatasız çıkarmak için özel olarak optimize edilmiştir.
 
-Elde edilen JSON verisi doğrudan backend'in `POST /api/stock/in` ucuna tek tek veya toplu liste (array) olarak gönderilebilir.
+Faturadaki satır yapısı genellikle şu sütunlardan oluşur:
+`[Ürün Kodu] | [Ürün Adı] | [Kategori] | [Miktar] | [Birim] | [BİRİM FİYAT] | [TOPLAM TUTAR]`
+Örnek: `"Elma Meyve 50 kg 40,00 2.000,00"`
+- Ürün Adı: `Elma`
+- Miktar: `50`
+- Birim: `kg`
+- Birim Fiyat: `40.00` TL
+- Toplam Tutar: `2000.00` TL
 
 ---
 
 ## 🤖 Claude Vision / n8n Sistem Prompt'u
 
-Aşağıdaki prompt'u AI modelinize sistem prompt'u veya analiz komutu olarak verin:
+Aşağıdaki metni Claude sistem prompt'u veya n8n AI node'u talimatı olarak birebir kullanın:
 
 ```text
-Sen bir anaokulu yemekhanesi için fatura ve irsaliye fotoğraflarını okuyan uzman bir veri çıkarma asistanısın.
+Sen bir anaokulu yemekhanesi için fatura ve irsaliye görsellerini satır satır okuyup veri çıkaran uzman bir AI veri asistanısın.
 
-Görevin:
-Görseldeki fatura/irsaliyede yer alan gıda ve sarf malzemelerini satır satır tespit etmek; ürün adı, miktar, birim ve birim alış fiyatını kurallara uygun olarak JSON formatında çıkarmaktır.
+GÖREVİN:
+Faturadaki tüm gıda ve mutfak malzemelerini satır satır tespit etmek; ürün adını, miktarını, ölçü birimini, BİRİM FİYATINI ve TOPLAM TUTARINI eksiksiz olarak JSON formatında çıkarmaktır.
 
-ZORUNLU ALANLAR VE KURALLAR:
-1. "urun_adi": Faturada geçen ürün adını temiz ve anlaşılır şekilde yaz (örn: "Dana Kıyma", "Süt (%3 Yağlı)", "Domates", "Beyaz Peynir", "Ayçiçek Yağı 5L"). Marka kodları veya anlamsız stok kodlarını temizle.
-2. "miktar": Satın alınan/teslim edilen miktar. SADECE sayısal (integer veya float) olarak yaz (örn: 10, 2.5, 30). Virgül (,) yerine nokta (.) kullan.
-3. "birim": Standart ölçü birimini yaz ("kg", "g", "litre", "L", "adet", "koli", "paket", "demet", "teneke"). Faturada belirtilmemişse mantıklı olanı (sebze/meyve/et için "kg", süt/yağ için "litre", ekmek/yumurta için "adet") belirle.
-4. "birim_fiyat": Ürünün 1 biriminin NET alış fiyatı (TL cinsinden sayısal değer, örn: 45.50).
-   - DURUM A (Birim Fiyat Varsa): Faturada birim fiyat sütunu varsa doğrudan bu fiyatı al.
-   - DURUM B (Sadece Toplam Tutar Varsa): Faturada doğrudan birim fiyat yazmıyor ama satır toplam tutarı (miktar × birim fiyat) yazıyorsa; birim_fiyat = toplam_tutar / miktar formülü ile 1 birimin fiyatını hesapla ve 2 ondalık basamağa yuvarla (örn: 10 kg domates 450 TL ise birim_fiyat: 45.00).
-   - DURUM C (Fiyat Yoksa / İrsaliye): Faturada/irsaliyede hiçbir fiyat veya tutar bilgisi yoksa "birim_fiyat": null olarak bırak. Asla piyasa fiyatı uydurma veya tahmin etme.
-5. SAYISAL FORMAT: Sayılarda para birimi sembolü (TL, ₺) veya binlik ayracı kullanma. Ondalık basamaklar için virgül değil MUTLAKA nokta kullan (Örn: 45,50 DEĞİL 45.50).
-6. HARİÇ TUTULACAKLAR: Fatura alt toplamı, KDV toplamı, genel iskonto, nakliye/kargo bedeli gibi genel toplam satırlarını ürün olarak ekleme. Sadece fiziki teslim alınan mutfak malzemelerini listele.
+FATURA TABLO YAPISI:
+Faturadaki satırlar genellikle şu sütun sırasına sahiptir:
+[Ürün Kodu / Barkod] [Ürün Adı] [Kategori] [Miktar] [Birim] [BİRİM FİYAT] [TOPLAM TUTAR]
+Örnek: "Elma Meyve 50 kg 40,00 2.000,00"
+Burada:
+- Ürün Adı: Elma
+- Miktar: 50
+- Birim: kg
+- BİRİM FİYAT: 40,00 (kg başına fiyat)
+- TOPLAM TUTAR: 2.000,00 (satır toplamı: 50 × 40 = 2000)
+
+ÇOK ÖNEMLİ KURALLAR (FİYAT VE SAYI FORMATI):
+1. TÜRKÇE SAYI DÖNÜŞÜMÜ:
+   - Faturada virgül (,) ONDALIK ayıracıdır: "40,00" -> 40.00 (veya 40).
+   - Faturada nokta (.) BİNLİK ayıracıdır: "2.000,00" -> 2000.00 (veya 2000).
+   - JSON çıktısında ASLA virgül (,), para birimi ("TL", "₺") veya birim eki ("/kg") bırakma. Sayıları saf float/number olarak yaz (örn: 40.00, 2000.00).
+
+2. BİRİM FİYAT ÇIKARMA ("birim_fiyat"):
+   - Faturadaki HER ürün için mutlaka "birim_fiyat" çıkar.
+   - Kural A (Birim Fiyat Sütunu Varsa): Faturada birim fiyat sütunu varsa o sütundaki değeri al ve sayıya çevir (örn: 40,00 -> 40.00).
+   - Kural B (Sadece Toplam Tutar Varsa): Faturada birim fiyat sütunu silikse veya yoksa ama satır toplam tutarı varsa; birim_fiyat = toplam_tutar / miktar formülü ile 1 birimin fiyatını sen hesapla (Örn: 50 kg elma toplam 2.000,00 TL ise -> 2000 / 50 = 40.00).
+   - Kural C (İrsaliye / Fiyatsız): Belgede hiçbir fiyat sütunu ve toplam tutar yoksa "birim_fiyat": null yap. Asla hayali fiyat uydurma.
+
+3. TOPLAM TUTAR ("toplam_tutar"):
+   - Satırın toplam tutarını da sayısal olarak "toplam_tutar" alanına yaz (örn: 2000.00).
+
+4. ÜRÜN ADI ("ad" veya "urun_adi"):
+   - Ürün adını temiz ve net yaz (örn: "Elma", "Dana Kıyma", "Süt (%3 Yağlı)", "Domates", "Beyaz Peynir"). Ürün kodlarını çıkar.
+
+5. MİKTAR ("miktar") VE BİRİM ("birim"):
+   - "miktar": Sayısal değer (örn: 50, 15.5, 30).
+   - "birim": Standart ölçü birimi ("kg", "litre", "adet", "koli", "paket", "teneke").
+
+6. HARİÇ TUTULACAKLAR:
+   - Genel fatura alt toplamı, KDV toplamı, iskonto toplamı veya kargo/nakliye satırlarını ürün olarak ekleme. Sadece teslim alınan mutfak malzemelerini listele.
 
 ÇIKTI FORMATI:
-SADECE geçerli bir JSON dizisi (array) döndür. Markdown kod bloğu (` ```json `), selamlama, özet veya ek metin YAZMA. Sadece saf JSON dizisi:
+SADECE geçerli bir JSON dizisi (array) döndür. Açıklama metni, markdown bloğu veya selamlama yazma.
 
+ÖRNEK JSON ÇIKTISI:
 [
   {
-    "urun_adi": "Dana Kıyma",
+    "ad": "Elma",
+    "miktar": 50,
+    "birim": "kg",
+    "birim_fiyat": 40.00,
+    "toplam_tutar": 2000.00
+  },
+  {
+    "ad": "Dana Kıyma",
     "miktar": 15,
     "birim": "kg",
-    "birim_fiyat": 450.00
+    "birim_fiyat": 450.00,
+    "toplam_tutar": 6750.00
   },
   {
-    "urun_adi": "Domates",
-    "miktar": 20,
-    "birim": "kg",
-    "birim_fiyat": 32.50
-  },
-  {
-    "urun_adi": "Süt (%3 Yağlı)",
+    "ad": "Süt (%3 Yağlı)",
     "miktar": 30,
     "birim": "litre",
-    "birim_fiyat": 29.75
+    "birim_fiyat": 32.50,
+    "toplam_tutar": 975.00
   },
   {
-    "urun_adi": "Tam Buğday Ekmeği",
-    "miktar": 50,
+    "ad": "Tam Buğday Ekmeği",
+    "miktar": 40,
     "birim": "adet",
-    "birim_fiyat": 12.00
-  },
-  {
-    "urun_adi": "Kuru Fasulye (İrsaliye - Fiyatsız)",
-    "miktar": 10,
-    "birim": "kg",
-    "birim_fiyat": null
+    "birim_fiyat": 12.50,
+    "toplam_tutar": 500.00
   }
 ]
 ```
@@ -68,53 +99,33 @@ SADECE geçerli bir JSON dizisi (array) döndür. Markdown kod bloğu (` ```json
 
 ## 📡 Backend Entegrasyonu (`POST /api/stock/in`)
 
-Backend'deki `POST /api/stock/in` uç noktası hem **tek bir ürünü** hem de **faturadaki tüm ürünleri içeren diziyi (array)** doğrudan kabul eder.
+AI çıktısını doğrudan `POST /api/stock/in` ucuna gönderebilirsiniz. 
 
-### Seçenek 1: Toplu Liste Gönderme (Tüm Faturayı Tek İstekte Gönderir)
-AI çıktısının tamamını doğrudan `POST /api/stock/in` adresine gövde (body) olarak gönderebilirsiniz:
-
-```json
-[
-  {
-    "urun_adi": "Dana Kıyma",
-    "miktar": 15,
-    "birim": "kg",
-    "birim_fiyat": 450.00,
-    "source_type": "invoice"
-  },
-  {
-    "urun_adi": "Domates",
-    "miktar": 20,
-    "birim": "kg",
-    "birim_fiyat": 32.50,
-    "source_type": "invoice"
-  }
-]
-```
-
-### Seçenek 2: Tekil Ürün Gönderme (Döngü ile satır satır)
-```json
-{
-  "product_name": "Domates",
-  "quantity": 20,
-  "unit": "kg",
-  "birim_fiyat": 32.50,
-  "source_type": "invoice"
-}
-```
-
-> **Desteklenen Alan Adları (Esnek Eşleştirme):**
-> - Ürün Adı: `urun_adi`, `urunAdi`, `product_name`, `name`
-> - Miktar: `miktar`, `quantity`, `adet`, `qty`
-> - Birim: `birim`, `unit`
-> - Birim Fiyat: `birim_fiyat`, `unit_price`, `fiyat`, `price`
-> - Toplam Tutar: `toplam_tutar`, `total_amount`, `tutar` (Birim fiyat boşsa backend otomatik olarak `toplam_tutar / miktar` hesabı yapar)
+### Kabul Edilen Esnek Alan İsimleri:
+Backend tüm varyasyonları otomatik olarak tanır:
+- **Ürün Adı:** `ad`, `urun_adi`, `urun`, `product_name`, `name`
+- **Miktar:** `miktar`, `adet`, `sayi`, `quantity`, `qty`
+- **Birim:** `birim`, `unit`
+- **Birim Fiyat:** `birim_fiyat`, `birimFiyat`, `fiyat`, `unit_price`
+- **Toplam Tutar:** `toplam_tutar`, `toplamTutar`, `tutar`, `total_amount` (Birim fiyat boş olsa bile backend `toplam_tutar / miktar` hesabını otomatik yapar)
 
 ---
 
-## ⚙️ Fiyat ve Stok İşleme Kuralları
+## 🔍 Railway Canlı Log Takibi
 
-1. **Stok Girişi Garantisi:** Faturada fiyat olsun ya da olmasın (`birim_fiyat: null` dahil), depo stok miktarı **HER ZAMAN** artırılır. Fiyat eksikliği stok takibini asla durdurmaz.
-2. **Fiyat Güncellemesi:** Faturadan geçerli bir `birim_fiyat` (veya `toplam_tutar`) gelmişse, ürünün `unit_price` alanı yeni alış fiyatıyla güncellenir.
-3. **Mevcut Fiyatı Koruma:** Faturada fiyat yer almıyorsa (irsaliye vb.), ürünün sistemde kayıtlı olan eski fiyatına **asla dokunulmaz**.
-4. **Railway Log Takibi:** Fatura işlendikten sonra Railway canlı loglarında hangi ürünlerin fiyatının kaç TL olarak güncellendiği `💰 [RAILWAY LOG - FİYAT GÜNCELLENDİ]` başlığı ile anında görünür.
+Fatura işlendiğinde Railway log konsolunda hemen şunlar görülür:
+
+1. **AI'dan Gelen Ham Veri:**
+   `🤖 AI'dan gelen: {"ad": "Elma", "miktar": 50, "birim": "kg", "birim_fiyat": 40, "toplam_tutar": 2000}`
+
+2. **Ayrıştırma ve Fiyat Güncellemesi:**
+   ```text
+   ======================================================================
+   💰 [RAILWAY LOG - FİYAT GÜNCELLENDİ]
+      Ürün: "Elma" (ID: 8)
+      Önceki Fiyat: Kayıtlı fiyat yok
+      Yeni Birim Fiyat: 40.00 TL
+      Eklenen Miktar: +50 kg
+      AI'dan Gelen Ham Kayıt: {"ad":"Elma","miktar":50,"birim":"kg","birim_fiyat":40}
+   ======================================================================
+   ```

@@ -150,20 +150,39 @@ function findMatchingProduct(targetName, products) {
 // ]
 
 async function processStockInItem(itemData) {
+  // Ham AI verisini Railway loguna yaz
+  console.log(`🤖 AI'dan gelen: ${JSON.stringify(itemData)}`);
+
   const searchedName = (
-    itemData.product_name ||
-    itemData.name ||
+    itemData.ad ||
     itemData.urun_adi ||
     itemData.urunAdi ||
     itemData.ürün_adı ||
+    itemData.urun ||
+    itemData.ürün ||
+    itemData.product_name ||
+    itemData.name ||
     itemData.item_name ||
     itemData.title ||
     ''
   ).toString().trim();
 
   const productId = itemData.product_id || itemData.id || null;
-  const rawQty = itemData.quantity ?? itemData.miktar ?? itemData.adet ?? itemData.qty ?? itemData.amount;
-  const unit = (itemData.unit || itemData.birim || itemData.olcu_birimi || 'kg').toString().trim().slice(0, 20);
+  const rawQty = (
+    itemData.miktar ??
+    itemData.adet ??
+    itemData.sayi ??
+    itemData.quantity ??
+    itemData.qty ??
+    itemData.amount
+  );
+  const unit = (
+    itemData.birim ||
+    itemData.unit ||
+    itemData.olcu_birimi ||
+    itemData.olcuBirimi ||
+    'kg'
+  ).toString().trim().slice(0, 20);
   const category = (itemData.category || itemData.kategori || 'genel').toString().trim().slice(0, 80);
   const critical_threshold = itemData.critical_threshold ?? itemData.kritik_esik ?? null;
   const protein_per_unit = itemData.protein_per_unit ?? itemData.protein ?? null;
@@ -180,7 +199,7 @@ async function processStockInItem(itemData) {
 
   // 1. Validasyon
   if (!productId && !searchedName) {
-    throw new Error('Ürün adı (urun_adi / product_name) veya product_id zorunludur.');
+    throw new Error('Ürün adı (ad / urun_adi / product_name) veya product_id zorunludur.');
   }
 
   const qty = parseNumericPrice(rawQty);
@@ -191,19 +210,26 @@ async function processStockInItem(itemData) {
   // 2. Fiyat Tespiti ve Gerekirse Toplam Tutardan Hesaplama
   const rawUnitPrice = (
     itemData.birim_fiyat ??
-    itemData.unit_price ??
-    itemData.fiyat ??
-    itemData.price ??
+    itemData.birim_fiyati ??
     itemData.birimFiyat ??
-    itemData.birim_fiyati
+    itemData.birimFiyati ??
+    itemData.unit_price ??
+    itemData.unitPrice ??
+    itemData.fiyat ??
+    itemData.alis_fiyati ??
+    itemData.alisFiyati ??
+    itemData.price
   );
   const rawTotalAmount = (
     itemData.toplam_tutar ??
-    itemData.toplam_fiyat ??
-    itemData.total_amount ??
-    itemData.tutar ??
     itemData.toplamTutar ??
-    itemData.total
+    itemData.toplam_fiyat ??
+    itemData.toplamFiyat ??
+    itemData.tutar ??
+    itemData.total_amount ??
+    itemData.totalAmount ??
+    itemData.total ??
+    itemData.tutar_tl
   );
 
   let parsedIncomingPrice = parseNumericPrice(rawUnitPrice);
@@ -214,7 +240,7 @@ async function processStockInItem(itemData) {
     const parsedTotal = parseNumericPrice(rawTotalAmount);
     if (parsedTotal !== null && parsedTotal >= 0 && qty > 0) {
       parsedIncomingPrice = Math.round((parsedTotal / qty) * 100) / 100;
-      priceCalcNote = `Toplam tutar (${parsedTotal} TL) / miktar (${qty}) formülü ile birim fiyat hesaplandı`;
+      priceCalcNote = `Toplam tutar (${parsedTotal} TL) / miktar (${qty}) = ${parsedIncomingPrice} TL/birim`;
     }
   }
 
@@ -375,12 +401,12 @@ async function processStockInItem(itemData) {
     console.log(`   Yeni Birim Fiyat: ${parsedIncomingPrice.toFixed(2)} TL`);
     console.log(`   Eklenen Miktar: +${qty} ${product.unit}`);
     if (priceCalcNote) {
-      console.log(`   Hesaplama Notu: ${priceCalcNote}`);
+      console.log(`   Hesaplama: ${priceCalcNote}`);
     }
-    console.log(`   Kaynak: ${resolvedSourceType}`);
+    console.log(`   AI'dan Gelen Ham Kayıt: ${JSON.stringify(itemData)}`);
     console.log('======================================================================');
   } else {
-    console.log(`ℹ️ [RAILWAY LOG - FİYAT DEĞİŞMEDİ] Ürün: "${product.name}" (ID: ${product.id}) | Faturada fiyat yer almadı. Mevcut Fiyat: ${previousPrice != null ? previousPrice + ' TL' : 'Kayıtlı fiyat yok'}`);
+    console.log(`ℹ️ [RAILWAY LOG - FİYAT DEĞİŞMEDİ] Ürün: "${product.name}" (ID: ${product.id}) | Faturada fiyat yer almadı. Mevcut Fiyat: ${previousPrice != null ? previousPrice + ' TL' : 'Kayıtlı fiyat yok'} | AI'dan gelen: ${JSON.stringify(itemData)}`);
   }
 
   let message = '';
@@ -418,6 +444,8 @@ async function processStockInItem(itemData) {
 
 router.post('/in', async (req, res) => {
   try {
+    console.log('📥 [POST /api/stock/in] İstek alındı. Gövde:', JSON.stringify(req.body));
+
     const rawItems = Array.isArray(req.body)
       ? req.body
       : (Array.isArray(req.body?.items) ? req.body.items : (Array.isArray(req.body?.products) ? req.body.products : [req.body]));

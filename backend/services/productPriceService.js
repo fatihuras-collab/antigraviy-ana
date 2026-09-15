@@ -27,16 +27,25 @@ function normalizeName(str) {
 function parseNumericPrice(val) {
   if (val == null || val === '') return null;
   if (typeof val === 'number') return isNaN(val) ? null : val;
-  let str = val.toString().trim()
-    .replace(/₺|TL|tl/gi, '')
-    .replace(/\s+/g, '')
-    .trim();
+  let str = val.toString().trim();
 
-  // "1.250,50" -> "1250.50"
+  // Para birimleri, birim ekleri ve gereksiz harfleri temizle
+  str = str.replace(/₺|TL|tl|TRY|try|\/kg|\/lt|\/adet|\/koli|\/paket|\/g|\/gr/gi, '').trim();
+  // Sadece rakam, nokta, virgül ve eksi işaretini bırak
+  str = str.replace(/[^\d.,-]/g, '').trim();
+  if (!str) return null;
+
+  // Hem nokta hem virgül varsa (örn: "2.000,00" veya "2,000.00")
   if (str.includes('.') && str.includes(',')) {
-    str = str.replace(/\./g, '').replace(',', '.');
+    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+      // Türkçe format: "2.000,00" -> "2000.00"
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else {
+      // İngilizce format: "2,000.00" -> "2000.00"
+      str = str.replace(/,/g, '');
+    }
   } else if (str.includes(',')) {
-    // "45,50" -> "45.50"
+    // Sadece virgül varsa: "40,00" -> "40.00"
     str = str.replace(',', '.');
   }
 
