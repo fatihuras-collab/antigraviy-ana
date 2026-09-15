@@ -211,6 +211,21 @@
             <span class="stat-label">İşlenen Öğün Sayısı</span>
             <span class="stat-value text-success" id="stat-meals-count">3 Öğün</span>
           </div>
+          <div class="stat-box">
+            <span class="stat-label">Toplam Malzeme Tutarı</span>
+            <span class="stat-value" style="color: #10b981;" id="stat-cost-value">₺0,00</span>
+          </div>
+        </div>
+
+        <!-- Günlük Maliyet ve Eksik Fiyat Uyarısı Banner'ı -->
+        <div id="cost-summary-banner" class="hidden" style="margin: 16px 0; padding: 14px 18px; border-radius: 10px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 22px;">💰</span>
+            <div>
+              <div id="cost-summary-text" style="font-weight: 600; color: #10b981; font-size: 15px;"></div>
+              <div id="cost-missing-warning" style="font-size: 13px; color: #f59e0b; margin-top: 4px;" class="hidden"></div>
+            </div>
+          </div>
         </div>
 
         <!-- 3 Öğün Kartları -->
@@ -517,6 +532,7 @@
                   <th>Ürün Adı</th>
                   <th>Birim</th>
                   <th>Kategori</th>
+                  <th class="text-right">Birim Fiyat</th>
                   <th class="text-right">Kritik Eşik</th>
                   <th class="text-right">Güncel Stok</th>
                   <th class="text-center">Durum</th>
@@ -772,8 +788,12 @@
               Son ayların kategori bazlı toplam tüketim dağılımı
             </p>
           </div>
-          <div class="chart-controls-group">
-            <span style="font-size: 0.78rem; color: var(--text-muted); margin-right: 4px;">Zaman Aralığı:</span>
+          <div class="chart-controls-group" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div style="display: inline-flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+              <button type="button" class="chip-btn active" id="btn-mode-tl" onclick="setAnalysisMetricMode('tl')">💰 Maliyet (TL)</button>
+              <button type="button" class="chip-btn" id="btn-mode-qty" onclick="setAnalysisMetricMode('qty')">📦 Miktar</button>
+            </div>
+            <span style="font-size: 0.78rem; color: var(--text-muted); margin-left: 6px; margin-right: 2px;">Aralık:</span>
             <button type="button" class="chip-btn" id="btn-range-6" onclick="setAnalysisRange(6)">Son 6 Ay</button>
             <button type="button" class="chip-btn active" id="btn-range-12" onclick="setAnalysisRange(12)">Son 12 Ay</button>
           </div>
@@ -908,6 +928,11 @@
               <option value="baharat">Baharat</option>
               <option value="diger">Diğer</option>
             </select>
+          </div>
+
+          <div class="mf-group">
+            <label class="mf-label">Birim Alış Fiyatı (TL)</label>
+            <input type="number" id="pmodal-price" class="mf-input" placeholder="örn: 45.50" min="0" step="0.01">
           </div>
 
           <div class="mf-group">

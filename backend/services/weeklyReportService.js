@@ -44,6 +44,10 @@ function round4(num) {
   return parseFloat((Number(num) || 0).toFixed(4));
 }
 
+function round2(num) {
+  return parseFloat((Number(num) || 0).toFixed(2));
+}
+
 /**
  * Bitiş tarihine göre son 7 günlük (dahil) aralığı hesaplar.
  * @param {string} [endDateStr] - YYYY-MM-DD formatında bitiş tarihi
@@ -90,7 +94,8 @@ async function generateWeeklyReportData(options = {}) {
   const totalMeals = mealPlans ? mealPlans.length : 0;
 
   // 2. Son 7 günün 'out' (tüketim) stok hareketlerini getir
-  const { data: outTxs, error: txErr } = await supabase
+  let outTxs = [];
+  let { data: txData, error: txErr } = await supabase
     .from('stock_transactions')
     .select(`
       id,
@@ -102,14 +107,38 @@ async function generateWeeklyReportData(options = {}) {
         id,
         name,
         unit,
-        category
+        category,
+        unit_price
       )
     `)
     .eq('transaction_type', 'out')
     .gte('transaction_date', startDate)
     .lte('transaction_date', endDate);
 
+  if (txErr && (txErr.code === '42703' || txErr.message?.includes('unit_price'))) {
+    const retry = await supabase
+      .from('stock_transactions')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        transaction_date,
+        transaction_type,
+        products (
+          id,
+          name,
+          unit,
+          category
+        )
+      `)
+      .eq('transaction_type', 'out')
+      .gte('transaction_date', startDate)
+      .lte('transaction_date', endDate);
+    txData = retry.data;
+    txErr = retry.error;
+  }
   if (txErr) throw txErr;
+  outTxs = txData || [];
 
   // Tüketilen ürünleri topla ve en çok tüketilen ilk 5'i bul
   const consumptionMap = {};
@@ -118,12 +147,16 @@ async function generateWeeklyReportData(options = {}) {
     const qty  = parseFloat(tx.quantity) || 0;
     const name = tx.products?.name || `Ürün #${pid}`;
     const unit = tx.products?.unit || 'adet';
+    const unitPrice = (tx.products?.unit_price != null && !isNaN(parseFloat(tx.products.unit_price)) && parseFloat(tx.products.unit_price) > 0)
+      ? parseFloat(tx.products.unit_price)
+      : null;
 
     if (!consumptionMap[pid]) {
       consumptionMap[pid] = {
         product_id: pid,
         name,
         unit,
+        unit_price: unitPrice,
         total_quantity: 0
       };
     }
@@ -133,6 +166,19 @@ async function generateWeeklyReportData(options = {}) {
   const topConsumed = Object.values(consumptionMap)
     .sort((a, b) => b.total_quantity - a.total_quantity)
     .slice(0, 5);
+
+  // Haftalık toplam malzeme maliyetini hesapla
+  let totalWeeklyCost = 0;
+  const missingPriceProducts = [];
+
+  Object.values(consumptionMap).forEach(item => {
+    if (item.unit_price != null) {
+      const cost = round2(item.total_quantity * item.unit_price);
+      totalWeeklyCost = round2(totalWeeklyCost + cost);
+    } else {
+      missingPriceProducts.push(item.name);
+    }
+  });
 
   // 3. Güncel stok ve kritik eşik durumunu getir (Azalan / Kritik ürünler)
   const { data: stockRows, error: stockErr } = await supabase
@@ -190,15 +236,21 @@ async function generateWeeklyReportData(options = {}) {
   const stagnantProducts = (allProducts || []).filter(p => !activeProductIds.has(p.id));
 
   return {
-    success:           true,
-    start_date:        startDate,
-    end_date:          endDate,
-    total_meals:       totalMeals,
-    top_consumed:      topConsumed,
-    critical_or_low:   criticalOrLow,
-    stagnant_products: stagnantProducts,
+    success:                true,
+    start_date:             startDate,
+    end_date:               endDate,
+    total_meals:            totalMeals,
+    total_cost:             totalWeeklyCost,
+    missing_price_products: missingPriceProducts,
+    missing_price_warning:  missingPriceProducts.length > 0
+      ? `Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: ${missingPriceProducts.join(', ')}`
+      : null,
+    top_consumed:           topConsumed,
+    critical_or_low:        criticalOrLow,
+    stagnant_products:      stagnantProducts,
     summary: {
       total_meals:           totalMeals,
+      total_cost:            totalWeeklyCost,
       top_consumed_count:    topConsumed.length,
       critical_or_low_count: criticalOrLow.length,
       stagnant_count:        stagnantProducts.length,
@@ -211,14 +263,17 @@ async function generateWeeklyReportData(options = {}) {
  * Haftalık rapor verisini okunaklı Telegram mesajına dönüştürür.
  * Format:
  * 📈 Haftalık Rapor ([başlangıç] - [bitiş])
- * Bu hafta toplam [X] öğün çıktı.
+ * Bu hafta toplam [X] öğün çıktı (Toplam maliyet: ~[Y] TL).
  * En çok tüketilen ürünler: [ürün - toplam miktar, ilk 5]
  * Azalan/kritik ürünler (hafta sonu için dikkat): [ürün - kalan]
  * Hiç hareket görmeyen (durgun) ürünler: [ürün listesi]
+ * ⚠️ Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: [liste] (varsa)
  */
 function formatWeeklyReportMessage(reportData) {
   const rangeDisplay = `${formatDateDisplay(reportData.start_date)} - ${formatDateDisplay(reportData.end_date)}`;
   const totalMeals   = reportData.total_meals ?? 0;
+  const totalCost    = reportData.total_cost ?? 0;
+  const formattedCost = totalCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // En çok tüketilen ilk 5 ürün
   let consumedLine = 'En çok tüketilen ürünler: ';
@@ -250,13 +305,19 @@ function formatWeeklyReportMessage(reportData) {
     stagnantLine += 'Yok (Tüm ürünlerde hareket mevcut)';
   }
 
-  return [
+  const lines = [
     `📈 Haftalık Rapor (${rangeDisplay})`,
-    `Bu hafta toplam ${totalMeals} öğün çıktı.`,
+    `Bu hafta toplam ${totalMeals} öğün çıktı (Toplam maliyet: ~${formattedCost} TL).`,
     consumedLine,
     criticalLine,
     stagnantLine
-  ].join('\n');
+  ];
+
+  if (reportData.missing_price_products && reportData.missing_price_products.length > 0) {
+    lines.push(`⚠️ Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: ${reportData.missing_price_products.join(', ')}`);
+  }
+
+  return lines.join('\n');
 }
 
 /**

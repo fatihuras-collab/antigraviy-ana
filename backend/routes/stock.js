@@ -124,11 +124,12 @@ function findMatchingProduct(targetName, products) {
 //   "quantity": 10.5
 // }
 //
-// Örnek body (n8n / Fatura - İsim ile):
+// Örnek body (n8n / Fatura - İsim ve Birim Fiyat ile):
 // {
 //   "product_name": "Elma (Starking)",
 //   "quantity": 10,
 //   "unit": "kg",
+//   "birim_fiyat": 45.00,
 //   "source_type": "invoice"
 // }
 router.post('/in', async (req, res) => {
@@ -142,6 +143,8 @@ router.post('/in', async (req, res) => {
       category,
       critical_threshold,
       protein_per_unit,
+      unit_price,
+      birim_fiyat,
       transaction_date,
       source_type = 'manual',
       source_id   = null
@@ -174,6 +177,13 @@ router.post('/in', async (req, res) => {
       resolvedSourceType = 'invoice';
     }
 
+    // Gelen birim fiyatı tespit et (birim_fiyat veya unit_price)
+    const rawPrice = (birim_fiyat !== undefined && birim_fiyat !== null && birim_fiyat !== '')
+      ? birim_fiyat
+      : unit_price;
+    const hasIncomingPrice = rawPrice !== undefined && rawPrice !== null && rawPrice !== '' && !isNaN(parseFloat(rawPrice)) && parseFloat(rawPrice) >= 0;
+    const parsedIncomingPrice = hasIncomingPrice ? parseFloat(rawPrice) : null;
+
     // ── Ürün Belirleme (ID ile veya İsim ile Eşleştirme / Yeni Ekleme) ──────────
     let product = null;
     let matchStatus = 'direct_id'; // 'direct_id' | 'matched' | 'created'
@@ -182,7 +192,7 @@ router.post('/in', async (req, res) => {
     if (product_id) {
       const { data: existingProd, error: productErr } = await supabase
         .from('products')
-        .select('id, name, unit, category')
+        .select('*')
         .eq('id', product_id)
         .single();
 
@@ -197,7 +207,7 @@ router.post('/in', async (req, res) => {
     if (!product && searchedName) {
       const { data: allProducts, error: listErr } = await supabase
         .from('products')
-        .select('id, name, unit, category');
+        .select('*');
 
       if (listErr) throw listErr;
 
@@ -227,18 +237,35 @@ router.post('/in', async (req, res) => {
           ? parseFloat(protein_per_unit)
           : 0;
 
-        const { data: createdProd, error: createErr } = await supabase
+        const insertPayload = {
+          id: nextId,
+          name: searchedName.slice(0, 150),
+          unit: newUnit,
+          category: newCategory,
+          critical_threshold: newCritical,
+          protein_per_unit: newProtein
+        };
+
+        if (hasIncomingPrice) {
+          insertPayload.unit_price = parsedIncomingPrice;
+        }
+
+        let { data: createdProd, error: createErr } = await supabase
           .from('products')
-          .insert([{
-            id: nextId,
-            name: searchedName.slice(0, 150),
-            unit: newUnit,
-            category: newCategory,
-            critical_threshold: newCritical,
-            protein_per_unit: newProtein
-          }])
-          .select('id, name, unit, category')
+          .insert([insertPayload])
+          .select('*')
           .single();
+
+        if (createErr && (createErr.code === '42703' || createErr.message?.includes('unit_price'))) {
+          delete insertPayload.unit_price;
+          const retry = await supabase
+            .from('products')
+            .insert([insertPayload])
+            .select('*')
+            .single();
+          createdProd = retry.data;
+          createErr = retry.error;
+        }
 
         if (createErr) throw createErr;
 
@@ -285,6 +312,30 @@ router.post('/in', async (req, res) => {
       console.error('[Stok Uyarı Hatası - stock/in]', err.message);
     });
 
+    // ── Fiyat Güncellemesi (Yalnızca faturada/girişte geçerli birim fiyat varsa) ──
+    // Kural: Fiyat gelmezse mevcut fiyata DOKUNULMAZ.
+    let priceUpdated = false;
+    if (!isNewProduct && hasIncomingPrice) {
+      try {
+        const { error: priceErr } = await supabase
+          .from('products')
+          .update({ unit_price: parsedIncomingPrice })
+          .eq('id', product.id);
+
+        if (!priceErr) {
+          product.unit_price = parsedIncomingPrice;
+          priceUpdated = true;
+        } else {
+          console.warn('[stock/in] Birim fiyat güncelleme uyarısı:', priceErr.message);
+        }
+      } catch (pErr) {
+        console.warn('[stock/in] Fiyat güncelleme hatası:', pErr.message);
+      }
+    } else if (isNewProduct && hasIncomingPrice) {
+      product.unit_price = parsedIncomingPrice;
+      priceUpdated = true;
+    }
+
     // ── Yanıt mesajı ─────────────────────────────────────────────────────────
     let message = '';
     if (matchStatus === 'created') {
@@ -295,16 +346,22 @@ router.post('/in', async (req, res) => {
       message = `${product.name} için ${qty} ${product.unit} stok girişi yapıldı.`;
     }
 
+    if (priceUpdated) {
+      message += ` (Birim fiyat: ${parsedIncomingPrice} TL güncellendi)`;
+    }
+
     res.status(201).json({
       success: true,
       message,
       match_status: matchStatus,
       is_new_product: isNewProduct,
+      price_updated: priceUpdated,
       product: {
         id: product.id,
         name: product.name,
         unit: product.unit,
-        category: product.category
+        category: product.category,
+        unit_price: product.unit_price ?? null
       },
       searched_name: searchedName || null,
       transaction,

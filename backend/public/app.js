@@ -188,6 +188,34 @@ function renderResults(data) {
   if (portionCount) portionCount.textContent = `${data.portion_count} Kişi`;
   if (mealsCount)   mealsCount.textContent = `${meals.length || 3} Öğün`;
 
+  // Maliyet ve Uyarı Gösterimi
+  const costVal    = document.getElementById('stat-cost-value');
+  const costBanner = document.getElementById('cost-summary-banner');
+  const costText   = document.getElementById('cost-summary-text');
+  const costWarn   = document.getElementById('cost-missing-warning');
+
+  const totalCost = data.total_cost || 0;
+  if (costVal) {
+    costVal.textContent = `₺${Number(totalCost).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  if (costBanner) {
+    if (data.cost_summary) {
+      costBanner.classList.remove('hidden');
+      if (costText) costText.textContent = data.cost_summary;
+      if (costWarn) {
+        if (data.missing_price_warning) {
+          costWarn.textContent = `⚠️ ${data.missing_price_warning}`;
+          costWarn.classList.remove('hidden');
+        } else {
+          costWarn.classList.add('hidden');
+        }
+      }
+    } else {
+      costBanner.classList.add('hidden');
+    }
+  }
+
   // 3 Öğün Kartları
   if (mealsContainer) {
     mealsContainer.innerHTML = '';
@@ -733,6 +761,9 @@ async function loadProducts() {
       const isCritical = thresh != null ? (stockQty <= thresh) : false;
 
       const formattedStock = `${formatStockQuantity(stockQty)} ${escapeHtml(p.unit || '')}`;
+      const formattedPrice = (p.unit_price != null && p.unit_price !== '') 
+        ? `₺${Number(p.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+        : '<span style="color:var(--text-muted)">—</span>';
       const statusBadge = isCritical
         ? `<span class="badge badge-danger"><span class="badge-dot"></span>Kritik</span>`
         : `<span class="badge badge-success"><span class="badge-dot"></span>Normal</span>`;
@@ -745,6 +776,7 @@ async function loadProducts() {
         <td><span class="item-name">${escapeHtml(p.name)}</span></td>
         <td>${escapeHtml(p.unit || '—')}</td>
         <td>${p.category ? `<span class="cat-badge">${escapeHtml(p.category)}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td class="text-right font-medium">${formattedPrice}</td>
         <td class="text-right">${p.critical_threshold != null ? `${formatStockQuantity(p.critical_threshold)} ${escapeHtml(p.unit || '')}` : '—'}</td>
         <td class="text-right font-medium"><span class="${isCritical ? 'text-danger' : ''}">${formattedStock}</span></td>
         <td class="text-center">${statusBadge}</td>
@@ -830,6 +862,7 @@ function editProduct(productId) {
   const nameEl    = document.getElementById('pmodal-name');
   const unitEl    = document.getElementById('pmodal-unit');
   const catEl     = document.getElementById('pmodal-category');
+  const priceEl   = document.getElementById('pmodal-price');
   const threshEl  = document.getElementById('pmodal-threshold');
   const proteinEl = document.getElementById('pmodal-protein');
   const alertEl   = document.getElementById('pmodal-alert');
@@ -839,6 +872,7 @@ function editProduct(productId) {
     if (titleEl)   titleEl.textContent = `Ürünü Düzenle: ${p.name}`;
     if (idEl)      idEl.value = p.id;
     if (nameEl)    nameEl.value = p.name || '';
+    if (priceEl)   priceEl.value = (p.unit_price != null && p.unit_price !== '') ? p.unit_price : '';
     if (threshEl)  threshEl.value = (p.critical_threshold != null && p.critical_threshold !== '') ? p.critical_threshold : '';
     if (proteinEl) proteinEl.value = (p.protein_per_unit != null && p.protein_per_unit !== '') ? p.protein_per_unit : '';
     if (alertEl)   alertEl.classList.add('hidden');
@@ -916,6 +950,7 @@ async function saveProductModal() {
   const nameEl    = document.getElementById('pmodal-name');
   const unitEl    = document.getElementById('pmodal-unit');
   const catEl     = document.getElementById('pmodal-category');
+  const priceEl   = document.getElementById('pmodal-price');
   const threshEl  = document.getElementById('pmodal-threshold');
   const proteinEl = document.getElementById('pmodal-protein');
   const alertEl   = document.getElementById('pmodal-alert');
@@ -926,6 +961,7 @@ async function saveProductModal() {
   const name      = nameEl?.value.trim();
   const unit      = unitEl?.value;
   const category  = catEl?.value || null;
+  const price     = priceEl?.value;
   const threshold = threshEl?.value;
   const protein   = proteinEl?.value;
 
@@ -949,6 +985,7 @@ async function saveProductModal() {
       name,
       unit,
       category,
+      unit_price: (price !== '' && price != null) ? parseFloat(price) : null,
       critical_threshold: (threshold !== '' && threshold != null) ? parseFloat(threshold) : null,
       protein_per_unit: (protein !== '' && protein != null) ? parseFloat(protein) : null
     };
@@ -1805,6 +1842,7 @@ async function menuSave() {
 
 let _analyticsData = null;
 let _analyticsRange = 12; // 6 veya 12 ay
+let _analyticsMetricMode = 'tl'; // 'tl' veya 'qty'
 let _analyticsSelectedMonth = null; // 'YYYY-MM'
 let _analyticsSelectedProductId = null;
 
@@ -1996,7 +2034,7 @@ function updateAnalysisKPIs() {
 
   if (monthEl) {
     if (_analyticsData?.has_price_data) {
-      const totalTL = currentMonthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.unit_price || 0)), 0);
+      const totalTL = currentMonthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.products?.unit_price || t.unit_price || 0)), 0);
       monthEl.textContent = `₺${totalTL.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     } else {
       const totalQty = currentMonthTxs.reduce((sum, t) => sum + parseFloat(t.quantity || 0), 0);
@@ -2018,6 +2056,13 @@ function updateAnalysisKPIs() {
     const distinctProds = new Set(txs.map(t => t.product_id));
     activeEl.textContent = distinctProds.size.toString();
   }
+}
+
+function setAnalysisMetricMode(mode) {
+  _analyticsMetricMode = mode;
+  document.getElementById('btn-mode-tl')?.classList.toggle('active', mode === 'tl');
+  document.getElementById('btn-mode-qty')?.classList.toggle('active', mode === 'qty');
+  renderMonthlyConsumptionChart();
 }
 
 function setAnalysisRange(n) {
@@ -2055,19 +2100,20 @@ function renderMonthlyConsumptionChart() {
 
   const txs = _analyticsData?.data?.transactions || [];
   const hasPrice = !!_analyticsData?.has_price_data;
+  const showTL = (_analyticsMetricMode === 'tl' && hasPrice);
   const monthList = getMonthRangeKeys(_analyticsRange);
   const labels = monthList.map(m => m.shortLabel);
 
   const titleEl = document.getElementById('main-chart-title');
   const subEl   = document.getElementById('main-chart-subtitle');
 
-  if (hasPrice) {
+  if (showTL) {
     if (titleEl) titleEl.textContent = '📈 Genel Aylık Tüketim Tutarı (TL)';
-    if (subEl)   subEl.textContent   = 'Her ayın toplam parasal tüketim tutarı (Miktar × Birim Fiyat)';
+    if (subEl)   subEl.textContent   = 'Her ayın toplam parasal tüketim tutarı (Miktar × Birim Alış Fiyatı)';
 
     const monthlyValues = monthList.map(m => {
       const monthTxs = txs.filter(t => (t.transaction_date || '').startsWith(m.key));
-      return monthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.unit_price || 0)), 0);
+      return monthTxs.reduce((sum, t) => sum + (parseFloat(t.quantity || 0) * parseFloat(t.products?.unit_price || t.unit_price || 0)), 0);
     });
 
     _chartMonthly = new Chart(ctx, {
@@ -2097,9 +2143,13 @@ function renderMonthlyConsumptionChart() {
       }
     });
   } else {
-    // Fiyat yoksa KATEGORİ BAZLI GRUPLU ÇUBUK GRAFİK
+    // KATEGORİ BAZLI GRUPLU ÇUBUK GRAFİK (Miktar veya Fiyat Eksik Modu)
     if (titleEl) titleEl.textContent = '📈 Genel Aylık Tüketim (Kategori Bazlı)';
-    if (subEl)   subEl.textContent   = 'Birim fiyat verisi bulunmadığından kategorilere göre gruplanmış tüketim miktarları';
+    if (subEl) {
+      subEl.textContent = hasPrice
+        ? 'Kategorilere göre aylık tüketilen malzeme miktarları'
+        : 'Birim fiyat verisi bulunmadığından kategorilere göre gruplanmış tüketim miktarları';
+    }
 
     const catSet = new Set();
     txs.forEach(t => { if (t.products?.category) catSet.add(t.products.category); });

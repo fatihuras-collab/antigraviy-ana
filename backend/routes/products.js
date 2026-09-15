@@ -73,10 +73,10 @@ router.get('/:id', async (req, res) => {
 
 // ─── POST /api/products ──────────────────────────────────────────────────────
 // Zorunlu: name, unit
-// Opsiyonel: category, critical_threshold, protein_per_unit
+// Opsiyonel: category, critical_threshold, protein_per_unit, unit_price
 router.post('/', async (req, res) => {
   try {
-    const { name, unit, category, critical_threshold, protein_per_unit } = req.body;
+    const { name, unit, category, critical_threshold, protein_per_unit, unit_price } = req.body;
 
     if (!name || !unit) {
       return res.status(400).json({
@@ -85,11 +85,37 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const { data, error } = await supabase
+    const insertData = {
+      name: name.trim(),
+      unit: unit.trim(),
+      category: category || null,
+      critical_threshold: (critical_threshold != null && critical_threshold !== '') ? parseFloat(critical_threshold) : null,
+      protein_per_unit: (protein_per_unit != null && protein_per_unit !== '') ? parseFloat(protein_per_unit) : null
+    };
+
+    if (unit_price !== undefined && unit_price !== '' && unit_price !== null) {
+      const parsedPrice = parseFloat(unit_price);
+      if (!isNaN(parsedPrice) && parsedPrice >= 0) {
+        insertData.unit_price = parsedPrice;
+      }
+    }
+
+    let { data, error } = await supabase
       .from('products')
-      .insert([{ name, unit, category, critical_threshold, protein_per_unit }])
+      .insert([insertData])
       .select()
       .single();
+
+    if (error && (error.code === '42703' || error.message?.includes('unit_price'))) {
+      delete insertData.unit_price;
+      const retry = await supabase
+        .from('products')
+        .insert([insertData])
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
@@ -102,11 +128,11 @@ router.post('/', async (req, res) => {
 // ─── PUT /api/products/:id ───────────────────────────────────────────────────
 // Ürünü güncelle (ID korunur, stok geçmişi ve reçete bağlantıları bozulmaz)
 // Zorunlu: name, unit
-// Opsiyonel: category, critical_threshold, protein_per_unit
+// Opsiyonel: category, critical_threshold, protein_per_unit, unit_price
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, unit, category, critical_threshold, protein_per_unit } = req.body;
+    const { name, unit, category, critical_threshold, protein_per_unit, unit_price } = req.body;
 
     if (!name || !unit) {
       return res.status(400).json({
@@ -127,12 +153,30 @@ router.put('/:id', async (req, res) => {
         : null
     };
 
-    const { data, error } = await supabase
+    if (unit_price !== undefined) {
+      updateData.unit_price = (unit_price !== '' && unit_price !== null && !isNaN(parseFloat(unit_price)))
+        ? parseFloat(unit_price)
+        : null;
+    }
+
+    let { data, error } = await supabase
       .from('products')
       .update(updateData)
       .eq('id', id)
       .select('*, current_stock(quantity)')
       .single();
+
+    if (error && (error.code === '42703' || error.message?.includes('unit_price'))) {
+      delete updateData.unit_price;
+      const retry = await supabase
+        .from('products')
+        .update(updateData)
+        .eq('id', id)
+        .select('*, current_stock(quantity)')
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     if (!data) {

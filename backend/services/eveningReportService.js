@@ -55,6 +55,10 @@ function round4(num) {
   return parseFloat((Number(num) || 0).toFixed(4));
 }
 
+function round2(num) {
+  return parseFloat((Number(num) || 0).toFixed(2));
+}
+
 function round1(num) {
   return parseFloat((Number(num) || 0).toFixed(1));
 }
@@ -104,8 +108,9 @@ async function generateEveningReportData(date) {
     };
   });
 
-  // 2. O günkü 'out' stok hareketlerini getir
-  const { data: outTxs, error: txErr } = await supabase
+  // 2. Günün 'out' stok hareketlerini getir
+  let todayTxs = [];
+  let { data: txData, error: txErr } = await supabase
     .from('stock_transactions')
     .select(`
       id,
@@ -119,16 +124,43 @@ async function generateEveningReportData(date) {
         name,
         unit,
         category,
-        critical_threshold
+        critical_threshold,
+        unit_price
       )
     `)
     .eq('transaction_type', 'out')
     .eq('transaction_date', targetDate);
 
+  if (txErr && (txErr.code === '42703' || txErr.message?.includes('unit_price'))) {
+    const retry = await supabase
+      .from('stock_transactions')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        transaction_date,
+        source_type,
+        source_id,
+        products (
+          id,
+          name,
+          unit,
+          category,
+          critical_threshold
+        )
+      `)
+      .eq('transaction_type', 'out')
+      .eq('transaction_date', targetDate);
+    txData = retry.data;
+    txErr = retry.error;
+  }
   if (txErr) throw txErr;
+  todayTxs = txData || [];
+  const outTxs = todayTxs;
 
   // 3. Güncel stok durumunu getir
-  const { data: currentStockRows, error: stockErr } = await supabase
+  let currentStockRows = [];
+  let { data: stockData, error: stockErr } = await supabase
     .from('current_stock')
     .select(`
       product_id,
@@ -138,17 +170,39 @@ async function generateEveningReportData(date) {
         name,
         unit,
         category,
-        critical_threshold
+        critical_threshold,
+        unit_price
       )
     `);
 
+  if (stockErr && (stockErr.code === '42703' || stockErr.message?.includes('unit_price'))) {
+    const retryStock = await supabase
+      .from('current_stock')
+      .select(`
+        product_id,
+        quantity,
+        products (
+          id,
+          name,
+          unit,
+          category,
+          critical_threshold
+        )
+      `);
+    stockData = retryStock.data;
+    stockErr = retryStock.error;
+  }
   if (stockErr) throw stockErr;
+  currentStockRows = stockData || [];
 
   const stockMap = {};
   const allProductsStock = {};
   (currentStockRows || []).forEach(row => {
     const q = parseFloat(row.quantity);
     const critThreshold = parseFloat(row.products?.critical_threshold || 0);
+    const uPrice = (row.products?.unit_price != null && !isNaN(parseFloat(row.products.unit_price)) && parseFloat(row.products.unit_price) > 0)
+      ? parseFloat(row.products.unit_price)
+      : null;
     stockMap[row.product_id] = q;
     allProductsStock[row.product_id] = {
       product_id:         row.product_id,
@@ -157,6 +211,7 @@ async function generateEveningReportData(date) {
       category:           row.products?.category,
       quantity:           q,
       critical_threshold: critThreshold,
+      unit_price:         uPrice,
       is_critical:        critThreshold > 0 && q <= critThreshold
     };
   });
@@ -172,6 +227,9 @@ async function generateEveningReportData(date) {
     const pUnit = p?.unit || 'adet';
     const pCat  = p?.category || 'genel';
     const pCrit = parseFloat(p?.critical_threshold || 0);
+    const pPrice = (p?.unit_price != null && !isNaN(parseFloat(p.unit_price)) && parseFloat(p.unit_price) > 0)
+      ? parseFloat(p.unit_price)
+      : null;
 
     if (tx.source_type === 'meal_plan' && tx.source_id && mealPlansMap[tx.source_id]) {
       mealPlansMap[tx.source_id].items.push({
@@ -189,6 +247,7 @@ async function generateEveningReportData(date) {
         category:           pCat,
         unit:               pUnit,
         critical_threshold: pCrit,
+        unit_price:         pPrice,
         daily_consumed:     0
       };
     }
@@ -215,11 +274,23 @@ async function generateEveningReportData(date) {
   const avgPortionsToday = studentCount > 0 ? studentCount : 70;
   const weeklyBaselines = await calculateWeeklyBaselines(targetDate, avgPortionsToday, dayOfWeek);
 
-  // 5. Konsolide ürün detaylarını hazırla
+  // 5. Konsolide ürün detaylarını ve maliyeti hazırla
+  let totalDailyCost = 0;
+  const missingPriceProducts = [];
+
   const consumedItems = Object.values(consolidatedMap).map(item => {
     const consumedQty = round4(item.daily_consumed);
     const remaining   = round4(stockMap[item.product_id] ?? 0);
     const isCritical  = item.critical_threshold > 0 && remaining <= item.critical_threshold;
+    const unitPrice   = item.unit_price;
+
+    let itemCost = null;
+    if (unitPrice != null) {
+      itemCost = round2(consumedQty * unitPrice);
+      totalDailyCost = round2(totalDailyCost + itemCost);
+    } else {
+      missingPriceProducts.push(item.product_name);
+    }
 
     const baselineInfo = weeklyBaselines[item.product_id] || {
       average: consumedQty,
@@ -253,6 +324,8 @@ async function generateEveningReportData(date) {
       product_name:       item.product_name,
       category:           item.category,
       unit:               item.unit,
+      unit_price:         unitPrice,
+      item_cost:          itemCost,
       daily_consumed:     consumedQty,
       current_stock:      remaining,
       critical_threshold: item.critical_threshold,
@@ -327,7 +400,12 @@ async function generateEveningReportData(date) {
       unit:               p.unit,
       critical_threshold: p.critical_threshold,
       warning:            `⚠️ ${p.name}: Mevcut stok (${p.quantity} ${p.unit}) kritik eşiğin (${p.critical_threshold} ${p.unit}) altında!`
-    }))
+    })),
+    total_cost:             totalDailyCost,
+    missing_price_products: missingPriceProducts,
+    missing_price_warning:  missingPriceProducts.length > 0
+      ? `Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: ${missingPriceProducts.join(', ')}`
+      : null
   };
 }
 
@@ -405,14 +483,17 @@ async function calculateWeeklyBaselines(targetDate, portionCount, dayOfWeek) {
  * Akşam raporu verisini okunaklı Telegram mesajına dönüştürür.
  * Format:
  * 📊 [tarih] Akşam Raporu
- * Bugün [X] öğrenci için yemek çıktı.
+ * Bugün [X] öğrenci için yemek çıktı (Toplam maliyet: ~[Y] TL).
  * En çok tüketilenler: [ürün - miktar, ...]
  * ⚠️ Kritik seviyedekiler: [ürün - kalan miktar, ...]
- * (veya kritik yoksa: 'Kritik seviyede ürün yok, her şey yolunda.')
+ * (veya kritik yoksa: 'Kritik ürün yok, her şey yolunda.')
+ * ⚠️ Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: [liste] (varsa)
  */
 function formatEveningReportMessage(reportData) {
   const dateFormatted = formatDateDisplay(reportData.report_date);
   const studentCount  = reportData.student_count ?? 0;
+  const totalCost     = reportData.total_cost ?? 0;
+  const formattedCost = totalCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // En çok tüketilenler
   const consumed = reportData.consumed_items || [];
@@ -440,12 +521,18 @@ function formatEveningReportMessage(reportData) {
     criticalLine = 'Kritik ürün yok, her şey yolunda.';
   }
 
-  return [
+  const lines = [
     `📊 ${dateFormatted} Akşam Raporu`,
-    `Bugün ${studentCount} öğrenci için yemek çıktı.`,
+    `Bugün ${studentCount} öğrenci için yemek çıktı (Toplam maliyet: ~${formattedCost} TL).`,
     consumedLine,
     criticalLine
-  ].join('\n');
+  ];
+
+  if (reportData.missing_price_products && reportData.missing_price_products.length > 0) {
+    lines.push(`⚠️ Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: ${reportData.missing_price_products.join(', ')}`);
+  }
+
+  return lines.join('\n');
 }
 
 /**

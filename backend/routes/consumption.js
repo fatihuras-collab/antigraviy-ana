@@ -363,11 +363,30 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // ── 6. Güncellenmiş stokları çek ─────────────────────────────────────────
+    // ── 6. Güncellenmiş stokları ve ürün birim fiyatlarını çek ───────────────
     const { data: updatedStockRows } = await supabase
       .from('current_stock')
       .select('product_id, quantity')
       .in('product_id', allProductIds);
+
+    // Ürünlerin güncel birim fiyatlarını (unit_price) getir
+    let productPriceRows = [];
+    const { data: priceData, error: priceErr } = await supabase
+      .from('products')
+      .select('id, name, unit, unit_price')
+      .in('id', allProductIds);
+
+    if (!priceErr) {
+      productPriceRows = priceData || [];
+    }
+
+    const prodPriceMap = {};
+    (productPriceRows || []).forEach(p => {
+      const price = (p.unit_price != null && !isNaN(parseFloat(p.unit_price)) && parseFloat(p.unit_price) > 0)
+        ? parseFloat(p.unit_price)
+        : null;
+      prodPriceMap[p.id] = price;
+    });
 
     // Stok kritik seviye kontrolü ve Telegram uyarısı
     checkStockAlerts(allProductIds).catch(err => {
@@ -377,17 +396,31 @@ router.post('/', async (req, res) => {
     const stockAfterMap = {};
     (updatedStockRows || []).forEach(s => { stockAfterMap[s.product_id] = parseFloat(s.quantity); });
 
-    // ── 7. Konsolide özet ve uyarılar ────────────────────────────────────────
+    // ── 7. Konsolide özet, maliyet hesabı ve uyarılar ─────────────────────────
+    let totalCost = 0;
+    const missingPriceProducts = [];
+
     const consolidatedList = Object.values(consolidatedNeeded).map(c => {
       const before = round4(stockBeforeMap[c.product_id] ?? 0);
       const after  = round4(stockAfterMap[c.product_id] ?? (before - c.total_needed));
       const isCrit = after <= c.critical_threshold;
+      const unitPrice = prodPriceMap[c.product_id] ?? null;
+
+      let itemCost = null;
+      if (unitPrice != null) {
+        itemCost = round2(c.total_needed * unitPrice);
+        totalCost = round2(totalCost + itemCost);
+      } else {
+        missingPriceProducts.push(c.name);
+      }
 
       return {
         product_id:         c.product_id,
         name:               c.name,
         unit:               c.unit,
         consumed:           c.total_needed,
+        unit_price:         unitPrice,
+        item_cost:          itemCost,
         stock_before:       before,
         stock_after:        after,
         critical_threshold: c.critical_threshold,
@@ -399,15 +432,32 @@ router.post('/', async (req, res) => {
       .filter(c => c.is_critical || c.stock_after < 5)
       .map(c => `⚠️ ${c.name}: stok ${c.stock_after} ${c.unit}'ye düştü (Kritik eşik: ${c.critical_threshold})`);
 
+    const formattedCost = totalCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const costSummaryText = `Bugün ${count} öğrenci için toplam ~${formattedCost} TL'lik malzeme kullanıldı.`;
+    const missingPriceWarning = missingPriceProducts.length > 0
+      ? `Şu ürünlerin fiyatı girilmemiş, maliyet eksik olabilir: ${missingPriceProducts.join(', ')}`
+      : null;
+
     res.status(201).json({
-      success:       true,
-      message:       `${dayName} gününün 3 öğünü işlendi (Kahvaltı, Öğle, İkindi) — ${count} porsiyon`,
-      date:          targetDate,
-      day_name:      dayName,
-      portion_count: count,
-      meals:         createdMealsResult,
-      consumption:   consolidatedList,
-      warnings:      warnings
+      success:               true,
+      message:               `${dayName} gününün 3 öğünü işlendi (Kahvaltı, Öğle, İkindi) — ${count} porsiyon`,
+      date:                  targetDate,
+      day_name:              dayName,
+      portion_count:         count,
+      total_cost:            totalCost,
+      cost_summary:          costSummaryText,
+      missing_price_products: missingPriceProducts,
+      missing_price_warning:  missingPriceWarning,
+      cost_analysis: {
+        total_cost:             totalCost,
+        total_cost_formatted:   `${formattedCost} TL`,
+        summary_text:           costSummaryText,
+        missing_price_products: missingPriceProducts,
+        missing_price_warning:  missingPriceWarning
+      },
+      meals:                 createdMealsResult,
+      consumption:           consolidatedList,
+      warnings:              warnings
     });
 
   } catch (err) {
@@ -516,6 +566,10 @@ function getDayOfWeek(dateStr) {
 
 function round4(num) {
   return parseFloat((Number(num) || 0).toFixed(4));
+}
+
+function round2(num) {
+  return parseFloat((Number(num) || 0).toFixed(2));
 }
 
 module.exports = router;
