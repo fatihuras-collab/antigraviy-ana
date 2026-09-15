@@ -2736,3 +2736,10 @@ body {
     align-items: flex-start;
   }
 }
+
+@media (max-width: 600px) {
+  .chart-container {
+    height: 270px !important;
+  }
+}
+

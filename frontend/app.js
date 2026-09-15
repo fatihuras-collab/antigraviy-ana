@@ -1840,12 +1840,11 @@ let _analyticsData = null;
 let _analyticsRange = 12; // 6 veya 12 ay
 let _analyticsMetricMode = 'tl'; // 'tl' veya 'qty'
 let _analyticsSelectedMonth = null; // 'YYYY-MM'
-let _analyticsSelectedProductId = null;
-
 let _chartMonthly = null;
 let _chartCategory = null;
 let _chartTopProducts = null;
-let _chartProductTrend = null;
+let _chartDailyCost = null;
+let _chartWeeklyCost = null;
 
 const AY_ADLARI = [
   'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
@@ -1958,16 +1957,16 @@ async function loadAnalysisPanel() {
       else emptyNotice.classList.add('hidden');
     }
 
-    // Ay ve ürün dropdown'larını başlat
+    // Ay dropdown'ını başlat
     initAnalysisMonthSelect(txs);
-    initAnalysisProductSelect(prods, txs);
 
     // KPI ve Grafikleri çiz
     updateAnalysisKPIs();
     renderMonthlyConsumptionChart();
     renderCategoryDistChart();
     renderTopProductsChart();
-    renderProductTrendChart();
+    renderDailyCostChart();
+    renderWeeklyCostChart();
   } catch (err) {
     console.error('[loadAnalysisPanel HATA]', err);
   }
@@ -1990,25 +1989,6 @@ function initAnalysisMonthSelect(txs) {
   select.innerHTML = monthRange.map(m => {
     const hasData = activeMonths.has(m.key);
     return `<option value="${m.key}" ${m.key === _analyticsSelectedMonth ? 'selected' : ''}>${m.label}${hasData ? ' (Kayıt Var)' : ''}</option>`;
-  }).join('');
-}
-
-function initAnalysisProductSelect(prods, txs) {
-  const select = document.getElementById('analysis-product-select');
-  if (!select) return;
-
-  const activeProdIds = new Set(txs.map(t => t.product_id));
-
-  if (!_analyticsSelectedProductId && prods.length > 0) {
-    const firstActive = prods.find(p => activeProdIds.has(p.id));
-    _analyticsSelectedProductId = firstActive ? firstActive.id : prods[0].id;
-  }
-
-  select.innerHTML = prods.map(p => {
-    const isActive = activeProdIds.has(p.id);
-    const hasPrice = (p.unit_price != null && !isNaN(parseFloat(p.unit_price)) && parseFloat(p.unit_price) > 0);
-    const priceTag = hasPrice ? ` — ₺${Number(p.unit_price).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-    return `<option value="${p.id}" ${p.id == _analyticsSelectedProductId ? 'selected' : ''}>${escapeHtml(p.name)} (${escapeHtml(p.unit || '')}${priceTag})${isActive ? ' •' : ''}</option>`;
   }).join('');
 }
 
@@ -2068,25 +2048,6 @@ function setAnalysisRange(n) {
   document.getElementById('btn-range-6')?.classList.toggle('active', n === 6);
   document.getElementById('btn-range-12')?.classList.toggle('active', n === 12);
   renderMonthlyConsumptionChart();
-  renderProductTrendChart();
-}
-
-function onAnalysisMonthChange() {
-  const select = document.getElementById('analysis-month-select');
-  if (select) {
-    _analyticsSelectedMonth = select.value;
-    updateAnalysisKPIs();
-    renderCategoryDistChart();
-    renderTopProductsChart();
-  }
-}
-
-function onAnalysisProductChange() {
-  const select = document.getElementById('analysis-product-select');
-  if (select) {
-    _analyticsSelectedProductId = parseInt(select.value, 10);
-    renderProductTrendChart();
-  }
 }
 
 // ── 1. GENEL AYLIK TÜKETİM GRAFİĞİ ──────────────────────────────────────────
@@ -2358,68 +2319,77 @@ function renderTopProductsChart() {
   });
 }
 
-// ── 4. ÜRÜN BAZLI TÜKETİM TRENDİ ──────────────────────────────────────────────
-function renderProductTrendChart() {
-  const ctx = document.getElementById('chart-product-trend')?.getContext('2d');
+function onAnalysisMonthChange() {
+  const select = document.getElementById('analysis-month-select');
+  if (select) {
+    _analyticsSelectedMonth = select.value;
+    updateAnalysisKPIs();
+    renderCategoryDistChart();
+    renderTopProductsChart();
+  }
+}
+
+// ── 4. GÜNLÜK VE HAFTALIK TOPLAM MALİYET TRENDLERİ ──────────────────────────
+
+function getLast30Days() {
+  const days = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    days.push({
+      key: `${yyyy}-${mm}-${dd}`,
+      label: `${dd}.${mm}`,
+      displayDate: `${dd}.${mm}.${yyyy}`
+    });
+  }
+  return days;
+}
+
+function renderDailyCostChart() {
+  const ctx = document.getElementById('chart-daily-cost')?.getContext('2d');
   if (!ctx) return;
 
-  if (_chartProductTrend) _chartProductTrend.destroy();
+  if (_chartDailyCost) _chartDailyCost.destroy();
 
   const txs = _analyticsData?.data?.transactions || [];
-  const prods = _analyticsData?.data?.products || [];
-  const monthList = getMonthRangeKeys(_analyticsRange);
-  const labels = monthList.map(m => m.shortLabel);
+  const days = getLast30Days();
+  const labels = days.map(d => d.label);
 
-  const selectedProd = prods.find(p => p.id == _analyticsSelectedProductId);
-  const prodName = selectedProd ? selectedProd.name : 'Seçilen Ürün';
-  const prodUnit = selectedProd ? selectedProd.unit : '';
-  const prodCategory = selectedProd ? selectedProd.category : '';
-  const prodPrice = (selectedProd?.unit_price != null && !isNaN(parseFloat(selectedProd.unit_price)) && parseFloat(selectedProd.unit_price) > 0)
-    ? parseFloat(selectedProd.unit_price)
-    : null;
-
-  const subEl = document.getElementById('prod-trend-subtitle');
-  const priceBadge = document.getElementById('prod-trend-price-badge');
-
-  if (priceBadge) {
-    if (prodPrice != null) {
-      priceBadge.textContent = `Birim Alış: ₺${prodPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${prodUnit}`;
-      priceBadge.classList.remove('hidden');
-    } else {
-      priceBadge.textContent = 'Birim Fiyat: Belirtilmemiş';
-      priceBadge.classList.remove('hidden');
-    }
-  }
-
-  const priceNote = prodPrice != null 
-    ? ` • Güncel Alış Fiyatı: ₺${prodPrice.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${prodUnit}`
-    : '';
-
-  if (subEl) subEl.textContent = `"${prodName}" ürününün son ${_analyticsRange} aydaki tüketim eğrisi${priceNote}`;
-
-  const values = monthList.map(m => {
-    const pTxs = txs.filter(t => t.product_id == _analyticsSelectedProductId && (t.transaction_date || '').startsWith(m.key));
-    return pTxs.reduce((sum, t) => sum + parseFloat(t.quantity || 0), 0);
+  let total30DayCost = 0;
+  const values = days.map(day => {
+    const dayTxs = txs.filter(t => (t.transaction_date || '').startsWith(day.key));
+    const dayCost = dayTxs.reduce((sum, t) => {
+      const qty = parseFloat(t.quantity || 0);
+      const price = (t.products?.unit_price != null && !isNaN(parseFloat(t.products.unit_price)) && parseFloat(t.products.unit_price) > 0)
+        ? parseFloat(t.products.unit_price)
+        : (t.unit_price != null && !isNaN(parseFloat(t.unit_price)) && parseFloat(t.unit_price) > 0 ? parseFloat(t.unit_price) : 0);
+      return sum + (qty * price);
+    }, 0);
+    total30DayCost += dayCost;
+    return dayCost;
   });
 
-  const col = getCategoryColor(prodCategory);
+  const badgeEl = document.getElementById('daily-cost-total-badge');
+  if (badgeEl) {
+    badgeEl.textContent = `30 Günlük Toplam: ₺${total30DayCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 
-  _chartProductTrend = new Chart(ctx, {
-    type: 'line',
+  _chartDailyCost = new Chart(ctx, {
+    type: 'bar',
     data: {
       labels,
       datasets: [{
-        label: `${prodName} (${prodUnit})`,
+        label: 'Günlük Maliyet (₺)',
         data: values,
-        borderColor: col.border || '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.12)',
-        fill: true,
-        tension: 0.35,
-        pointBackgroundColor: col.border || '#10b981',
-        pointBorderColor: '#ffffff',
-        pointBorderWidth: 1.5,
-        pointRadius: 4,
-        pointHoverRadius: 7
+        backgroundColor: 'rgba(16, 185, 129, 0.75)',
+        hoverBackgroundColor: '#10b981',
+        borderColor: '#10b981',
+        borderWidth: 1,
+        borderRadius: 4
       }]
     },
     options: {
@@ -2429,23 +2399,157 @@ function renderProductTrendChart() {
         tooltip: {
           ...getChartDefaultOptions().plugins.tooltip,
           callbacks: {
-            label: (ctx) => {
-              const qty = parseFloat(ctx.raw || 0);
-              let tip = ` ${prodName}: ${ctx.formattedValue} ${prodUnit}`;
-              if (prodPrice != null && qty > 0) {
-                const cost = (qty * prodPrice).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                tip += ` (~₺${cost})`;
-              }
-              return tip;
-            }
+            title: (items) => {
+              const idx = items[0]?.dataIndex;
+              return days[idx] ? `Tarih: ${days[idx].displayDate}` : '';
+            },
+            label: (ctx) => ` Toplam Tutar: ₺${(ctx.raw || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           }
         }
       },
       scales: {
         ...getChartDefaultOptions().scales,
+        x: {
+          ...getChartDefaultOptions().scales.x,
+          ticks: {
+            autoSkip: true,
+            maxRotation: 45,
+            minRotation: 0,
+            color: '#94a3b8',
+            font: { size: 11 }
+          }
+        },
         y: {
           ...getChartDefaultOptions().scales.y,
-          title: { display: true, text: prodUnit ? `Miktar (${prodUnit})` : 'Miktar', color: '#94a3b8' }
+          title: { display: true, text: 'Maliyet (TL)', color: '#94a3b8' },
+          ticks: {
+            callback: (val) => `₺${val.toLocaleString('tr-TR')}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function getLast12Weeks() {
+  const weeks = [];
+  const now = new Date();
+
+  // Bu haftanın Pazartesi gününü bul (ISO hafta standardı)
+  const currentDay = now.getDay();
+  const distanceToMonday = (currentDay === 0 ? -6 : 1 - currentDay);
+  const currentMonday = new Date(now);
+  currentMonday.setDate(now.getDate() + distanceToMonday);
+  currentMonday.setHours(0, 0, 0, 0);
+
+  const formatYMD = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const formatDM = (d) => {
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${dd}.${mm}`;
+  };
+
+  for (let i = 11; i >= 0; i--) {
+    const monday = new Date(currentMonday);
+    monday.setDate(currentMonday.getDate() - (i * 7));
+
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const startStr = formatYMD(monday);
+    const endStr = formatYMD(sunday);
+    const label = `${formatDM(monday)} - ${formatDM(sunday)}`;
+
+    weeks.push({ startStr, endStr, label });
+  }
+  return weeks;
+}
+
+function renderWeeklyCostChart() {
+  const ctx = document.getElementById('chart-weekly-cost')?.getContext('2d');
+  if (!ctx) return;
+
+  if (_chartWeeklyCost) _chartWeeklyCost.destroy();
+
+  const txs = _analyticsData?.data?.transactions || [];
+  const weeks = getLast12Weeks();
+  const labels = weeks.map(w => w.label);
+
+  let total12WeekCost = 0;
+  const values = weeks.map(week => {
+    const weekTxs = txs.filter(t => {
+      const d = (t.transaction_date || '');
+      return d >= week.startStr && d <= week.endStr;
+    });
+    const weekCost = weekTxs.reduce((sum, t) => {
+      const qty = parseFloat(t.quantity || 0);
+      const price = (t.products?.unit_price != null && !isNaN(parseFloat(t.products.unit_price)) && parseFloat(t.products.unit_price) > 0)
+        ? parseFloat(t.products.unit_price)
+        : (t.unit_price != null && !isNaN(parseFloat(t.unit_price)) && parseFloat(t.unit_price) > 0 ? parseFloat(t.unit_price) : 0);
+      return sum + (qty * price);
+    }, 0);
+    total12WeekCost += weekCost;
+    return weekCost;
+  });
+
+  const badgeEl = document.getElementById('weekly-cost-total-badge');
+  if (badgeEl) {
+    badgeEl.textContent = `12 Haftalık Toplam: ₺${total12WeekCost.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+
+  _chartWeeklyCost = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Haftalık Maliyet (₺)',
+        data: values,
+        backgroundColor: 'rgba(99, 102, 241, 0.75)',
+        hoverBackgroundColor: '#6366f1',
+        borderColor: '#6366f1',
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      ...getChartDefaultOptions(),
+      plugins: {
+        ...getChartDefaultOptions().plugins,
+        tooltip: {
+          ...getChartDefaultOptions().plugins.tooltip,
+          callbacks: {
+            title: (items) => {
+              const idx = items[0]?.dataIndex;
+              return weeks[idx] ? `Aralık: ${weeks[idx].label}` : '';
+            },
+            label: (ctx) => ` Toplam Tutar: ₺${(ctx.raw || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          }
+        }
+      },
+      scales: {
+        ...getChartDefaultOptions().scales,
+        x: {
+          ...getChartDefaultOptions().scales.x,
+          ticks: {
+            autoSkip: true,
+            maxRotation: 45,
+            minRotation: 0,
+            color: '#94a3b8',
+            font: { size: 11 }
+          }
+        },
+        y: {
+          ...getChartDefaultOptions().scales.y,
+          title: { display: true, text: 'Maliyet (TL)', color: '#94a3b8' },
+          ticks: {
+            callback: (val) => `₺${val.toLocaleString('tr-TR')}`
+          }
         }
       }
     }

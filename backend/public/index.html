@@ -848,24 +848,56 @@
         </section>
       </div>
 
-      <!-- Ürün Bazlı Trend (Tam Genişlik) -->
-      <section class="card" style="margin-bottom: 30px;">
-        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <h3 class="card-title" style="font-size: 1rem;">📉 Ürün Bazlı Tüketim Trendi</h3>
-            <p class="card-description" id="prod-trend-subtitle">Seçilen malzemenin aylık tüketim grafiği</p>
+      <!-- ── TOPLAM MALİYET TRENDİ BÖLÜMÜ ── -->
+      <div class="analytics-cost-trends-grid" style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 30px;">
+        
+        <!-- 1. Günlük Maliyet Trendi (Son 30 Gün) -->
+        <section class="card">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">
+                📅 Günlük Maliyet Trendi (Son 30 Gün)
+              </h3>
+              <p class="card-description">
+                Günün tüketilen malzemelerinin toplam harcama tutarı (Miktar × Birim Fiyat)
+              </p>
+            </div>
+            <div id="daily-cost-total-badge" class="cat-badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.8rem; padding: 4px 12px; text-transform: none; letter-spacing: 0;">
+              30 Günlük Toplam: ₺0,00
+            </div>
           </div>
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <label for="analysis-product-select" style="font-size: 0.8rem; color: var(--text-muted);">Ürün:</label>
-            <select id="analysis-product-select" class="mf-input mf-select" style="width: auto; min-width: 220px; padding: 6px 12px; height: 38px;" onchange="onAnalysisProductChange()">
-            </select>
-            <span id="prod-trend-price-badge" class="cat-badge hidden" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.78rem; padding: 4px 10px; text-transform: none; letter-spacing: 0;"></span>
+          <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
+            <canvas id="chart-daily-cost"></canvas>
           </div>
-        </div>
-        <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
-          <canvas id="chart-product-trend"></canvas>
-        </div>
-      </section>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>ℹ️</span> <span>Fiyatı girilmemiş ürünler maliyete dahil değildir.</span>
+          </div>
+        </section>
+
+        <!-- 2. Haftalık Maliyet Trendi (Son 12 Hafta) -->
+        <section class="card">
+          <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <div>
+              <h3 class="card-title" style="font-size: 1.05rem;">
+                📊 Haftalık Maliyet Trendi (Son 12 Hafta)
+              </h3>
+              <p class="card-description">
+                Haftalık periyotlarda tüketilen malzemelerin toplam harcama tutarı
+              </p>
+            </div>
+            <div id="weekly-cost-total-badge" class="cat-badge" style="background: rgba(99, 102, 241, 0.15); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.35); font-size: 0.8rem; padding: 4px 12px; text-transform: none; letter-spacing: 0;">
+              12 Haftalık Toplam: ₺0,00
+            </div>
+          </div>
+          <div class="chart-container" style="position: relative; height: 320px; width: 100%;">
+            <canvas id="chart-weekly-cost"></canvas>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>ℹ️</span> <span>Fiyatı girilmemiş ürünler maliyete dahil değildir.</span>
+          </div>
+        </section>
+
+      </div>
     </main>
 
     <!-- Alt Bilgi -->
