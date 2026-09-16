@@ -296,33 +296,48 @@ function renderResults(data) {
 // GERİ BİLDİRİM EKRANI (4 HAFTA & GÜN SEÇİCİ DESTEKLİ)
 // ─────────────────────────────────────────────────────────────────────────────
 
-let currentFeedbackWeek = 1;
-let currentFeedbackDay  = 1;
+let currentFeedbackWeek = null;
+let currentFeedbackDay  = null;
 let currentFeedbackDate = null;
+
+function updateFeedbackPillActiveStates(week, day) {
+  if (week) {
+    document.querySelectorAll('#fb-week-pills .pill-btn').forEach(btn => {
+      const w = parseInt(btn.getAttribute('data-week'), 10);
+      btn.classList.toggle('active', w === week);
+    });
+  }
+  if (day) {
+    document.querySelectorAll('#fb-day-pills .pill-btn').forEach(btn => {
+      const d = parseInt(btn.getAttribute('data-day'), 10);
+      btn.classList.toggle('active', d === day);
+    });
+  }
+}
 
 function selectFeedbackWeek(week) {
   currentFeedbackWeek = week;
-  document.querySelectorAll('#fb-week-pills .pill-btn').forEach(btn => {
-    const w = parseInt(btn.getAttribute('data-week'), 10);
-    btn.classList.toggle('active', w === week);
-  });
-  loadFeedbackMeals(currentFeedbackWeek, currentFeedbackDay);
+  updateFeedbackPillActiveStates(currentFeedbackWeek, currentFeedbackDay || 1);
+  loadFeedbackMeals(currentFeedbackWeek, currentFeedbackDay || 1, true);
 }
 
 function selectFeedbackDay(day) {
   currentFeedbackDay = day;
-  document.querySelectorAll('#fb-day-pills .pill-btn').forEach(btn => {
-    const d = parseInt(btn.getAttribute('data-day'), 10);
-    btn.classList.toggle('active', d === day);
-  });
-  loadFeedbackMeals(currentFeedbackWeek, currentFeedbackDay);
+  updateFeedbackPillActiveStates(currentFeedbackWeek || 1, currentFeedbackDay);
+  loadFeedbackMeals(currentFeedbackWeek || 1, currentFeedbackDay, true);
 }
 
-async function loadFeedbackMeals(week = currentFeedbackWeek, day = currentFeedbackDay) {
+function loadFeedbackMealsAutoToday() {
+  loadFeedbackMeals(null, null, false);
+}
+
+async function loadFeedbackMeals(week = null, day = null, isManual = false) {
   const loadingEl  = document.getElementById('feedback-loading');
   const emptyEl    = document.getElementById('feedback-empty');
   const gridEl     = document.getElementById('feedback-cards-grid');
   const bannerText = document.getElementById('active-day-text');
+  const noticeEl   = document.getElementById('feedback-today-notice');
+  const noticeText = document.getElementById('feedback-today-notice-text');
 
   if (!loadingEl || !emptyEl || !gridEl) return;
 
@@ -333,20 +348,53 @@ async function loadFeedbackMeals(week = currentFeedbackWeek, day = currentFeedba
   gridEl.innerHTML = '';
 
   try {
-    const res  = await fetch(`${API_BASE_URL}/api/meal-feedback/today?week=${week}&day=${day}`);
+    let url = `${API_BASE_URL}/api/meal-feedback/today`;
+    if (isManual && week && day) {
+      url += `?week=${week}&day=${day}`;
+    }
+
+    const res  = await fetch(url);
     const data = await res.json();
 
     loadingEl.classList.add('hidden');
 
     if (!data.success || !data.meals || data.meals.length === 0) {
       emptyEl.classList.remove('hidden');
+      if (noticeEl && noticeText && data.notice) {
+        noticeText.textContent = data.notice;
+        noticeEl.classList.remove('hidden');
+      }
       return;
     }
 
+    if (isManual && week && day) {
+      currentFeedbackWeek = week;
+      currentFeedbackDay  = day;
+    } else {
+      currentFeedbackWeek = data.week_number;
+      currentFeedbackDay  = data.day_of_week;
+    }
     currentFeedbackDate = data.date;
+
+    // Hafta ve Gün pill butonlarını otomatik olarak seçilen/bulunan güne eşitle
+    updateFeedbackPillActiveStates(currentFeedbackWeek, currentFeedbackDay);
+
+    // Hafta sonu veya menü bulunamadığında bildirim notunu göster
+    if (noticeEl && noticeText) {
+      if (data.notice && !isManual) {
+        noticeText.textContent = data.notice;
+        noticeEl.classList.remove('hidden');
+      } else {
+        noticeEl.classList.add('hidden');
+      }
+    }
+
     if (bannerText) {
       const ageGroup = currentSettings?.target_age_group || '2-6 Yaş Grubu';
-      bannerText.textContent = `${data.week_number}. Hafta • ${data.day_name} Menüsü (Tarih: ${data.date}) • ${ageGroup}`;
+      const todayBadge = data.is_today 
+        ? '<span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; margin-right: 6px; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="status-dot"></span>BUGÜN</span>' 
+        : '';
+      bannerText.innerHTML = `${todayBadge}${data.week_number}. Hafta • ${data.day_name} Menüsü (${data.date}) • ${ageGroup}`;
     }
 
     renderFeedbackCards(data.meals);
@@ -562,9 +610,15 @@ function showMonthlyWeek(weekNum) {
 
 function jumpToEvaluation(week, day) {
   switchTab('feedback');
-  selectFeedbackWeek(week);
-  selectFeedbackDay(day);
+  currentFeedbackWeek = week;
+  currentFeedbackDay = day;
+  updateFeedbackPillActiveStates(week, day);
+  loadFeedbackMeals(week, day, true);
 }
+
+window.loadFeedbackMealsAutoToday = loadFeedbackMealsAutoToday;
+window.loadFeedbackMeals = loadFeedbackMeals;
+window.jumpToEvaluation = jumpToEvaluation;
 
 function openSettingsModal() {
   const modal = document.getElementById('settings-modal');

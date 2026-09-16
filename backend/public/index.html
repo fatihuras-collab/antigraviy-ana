@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.3.0">
+  <link rel="stylesheet" href="style.css?v=2.4.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -302,19 +302,32 @@
           <div class="filter-group">
             <span class="filter-label">Gün:</span>
             <div class="filter-pills" id="fb-day-pills">
-              <button type="button" class="pill-btn active" data-day="1" onclick="selectFeedbackDay(1)">Pazartesi</button>
+              <button type="button" class="pill-btn" data-day="1" onclick="selectFeedbackDay(1)">Pazartesi</button>
               <button type="button" class="pill-btn" data-day="2" onclick="selectFeedbackDay(2)">Salı</button>
               <button type="button" class="pill-btn" data-day="3" onclick="selectFeedbackDay(3)">Çarşamba</button>
               <button type="button" class="pill-btn" data-day="4" onclick="selectFeedbackDay(4)">Perşembe</button>
               <button type="button" class="pill-btn" data-day="5" onclick="selectFeedbackDay(5)">Cuma</button>
             </div>
           </div>
+
+          <div class="filter-group filter-today-action" style="margin-left: auto; align-self: center;">
+            <button type="button" id="btn-feedback-today" class="btn btn-outline-sm btn-today-pill" onclick="loadFeedbackMealsAutoToday()" title="Bugünün menüsüne dön" style="padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 700; background: rgba(59, 130, 246, 0.12); border-color: rgba(59, 130, 246, 0.35); color: #93c5fd; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <span>🗓️</span>
+              <span>Bugün</span>
+            </button>
+          </div>
         </div>
 
         <!-- Aktif Gün Bilgi Rozeti -->
         <div class="active-day-banner" id="active-day-banner">
           <span class="banner-icon">🗓️</span>
-          <span id="active-day-text">1. Hafta • Pazartesi Menüsü (<span class="setting-age-group">2-6 Yaş Grubu</span>)</span>
+          <span id="active-day-text">Günün Menüsü Yükleniyor...</span>
+        </div>
+
+        <!-- Bugün Bildirim Notu (Hafta sonu veya Menü Yoksa) -->
+        <div id="feedback-today-notice" class="feedback-today-notice hidden" style="margin-top: 10px; padding: 10px 14px; border-radius: 8px; font-size: 0.82rem; display: flex; align-items: center; gap: 8px; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.28); color: #fbbf24;">
+          <span style="font-size: 1.1rem; flex-shrink: 0;">ℹ️</span>
+          <span id="feedback-today-notice-text">Bugün için menü tanımlı değil.</span>
         </div>
       </section>
 
@@ -1122,7 +1135,7 @@
     window.toggleMenuSettings = toggleMenuSettings;
   </script>
 
-  <script src="app.js?v=2.3.0"></script>
+  <script src="app.js?v=2.4.0"></script>
 </body>
 </html>
 

@@ -224,62 +224,188 @@ const GUN_ISIMLERI = {
 
 // ─── GET /api/meal-feedback/today ─────────────────────────────────────────────
 // Belirtilen haftanın veya günün 3 öğününü, feedback durumunu ve uyarı bilgisini döndürür
-// Parametreler: ?week=1..4 & day=1..5 VEYA ?date=YYYY-MM-DD
+// Parametreler: ?week=1..4 & day=1..5 VEYA ?date=YYYY-MM-DD (Hiçbiri verilmezse otomatik BUGÜN)
 router.get('/today', async (req, res) => {
   try {
     let weekNumber = req.query.week ? parseInt(req.query.week, 10) : null;
     let dayOfWeek  = req.query.day  ? parseInt(req.query.day, 10)  : null;
-    let targetDate = req.query.date;
+    let targetDate = req.query.date ? req.query.date.trim() : null;
+    let notice = null;
 
-    // Eğer tarih yoksa, hafta ve gün varsa tarihi o haftaya göre hesapla
-    if (!targetDate) {
-      if (weekNumber && dayOfWeek) {
-        const base = new Date(WEEK_BASE_DATES[weekNumber] || '2026-09-07');
+    // Türkiye saati ile bugünün tarihi (YYYY-MM-DD)
+    const todayFormatter = new Intl.DateTimeFormat('fr-CA', {
+      timeZone: 'Europe/Istanbul',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const actualToday = todayFormatter.format(new Date());
+
+    let menuRows = null;
+
+    // DURUM 1: Kullanıcı belirli bir hafta ve gün seçmişse (manuel filtreleme)
+    if (weekNumber && dayOfWeek) {
+      try {
+        const { data: mRows } = await supabase
+          .from('monthly_menu')
+          .select(`
+            id,
+            meal_type,
+            date,
+            week_number,
+            day_of_week,
+            recipes (
+              id,
+              meal_name,
+              meal_type
+            )
+          `)
+          .eq('week_number', weekNumber)
+          .eq('day_of_week', dayOfWeek);
+
+        if (mRows && mRows.length > 0) {
+          menuRows = mRows;
+          targetDate = mRows[0].date || targetDate;
+        }
+      } catch (_) {}
+
+      if (!targetDate) {
+        const base = new Date((WEEK_BASE_DATES[weekNumber] || '2026-09-07') + 'T12:00:00');
         base.setDate(base.getDate() + (dayOfWeek - 1));
         targetDate = base.toISOString().split('T')[0];
+      }
+    }
+    // DURUM 2: Belirli bir tarih verilmişse
+    else if (targetDate) {
+      const dateObj = new Date(targetDate + 'T12:00:00');
+      const dateDow = dateObj.getDay();
+      const isWeekend = dateDow === 0 || dateDow === 6;
+
+      try {
+        const { data: mRows } = await supabase
+          .from('monthly_menu')
+          .select(`
+            id,
+            meal_type,
+            date,
+            week_number,
+            day_of_week,
+            recipes (
+              id,
+              meal_name,
+              meal_type
+            )
+          `)
+          .eq('date', targetDate);
+
+        if (mRows && mRows.length > 0) {
+          menuRows = mRows;
+          weekNumber = mRows[0].week_number || weekNumber;
+          dayOfWeek  = mRows[0].day_of_week  || dayOfWeek;
+        } else {
+          notice = isWeekend 
+            ? 'Bugün hafta sonu olduğu için menü tanımlı değil.' 
+            : 'Bugün için menü tanımlı değil.';
+        }
+      } catch (_) {}
+    }
+    // DURUM 3: Otomatik BUGÜN (Varsayılan ekran açılışı)
+    else {
+      targetDate = actualToday;
+      const todayDateObj = new Date(actualToday + 'T12:00:00');
+      const rawDow = todayDateObj.getDay(); // 0=Pazar, 6=Cumartesi
+
+      if (rawDow === 0 || rawDow === 6) {
+        // Bugün hafta sonu! En yakın iş gününü bul (önceki Cuma)
+        const prevFri = new Date(actualToday + 'T12:00:00');
+        prevFri.setDate(prevFri.getDate() - (rawDow === 6 ? 1 : 2));
+        const friStr = prevFri.toISOString().split('T')[0];
+
+        try {
+          const { data: mFri } = await supabase
+            .from('monthly_menu')
+            .select(`
+              id,
+              meal_type,
+              date,
+              week_number,
+              day_of_week,
+              recipes (
+                id,
+                meal_name,
+                meal_type
+              )
+            `)
+            .eq('date', friStr);
+
+          if (mFri && mFri.length > 0) {
+            menuRows = mFri;
+            targetDate = friStr;
+            weekNumber = mFri[0].week_number;
+            dayOfWeek = mFri[0].day_of_week;
+            notice = `Bugün hafta sonu olduğu için menü tanımlı değil. En yakın iş günü (${mFri[0].week_number}. Hafta Cuma) menüsü gösteriliyor.`;
+          }
+        } catch (_) {}
+
+        if (!menuRows || menuRows.length === 0) {
+          notice = 'Bugün hafta sonu olduğu için menü tanımlı değil. 1. Hafta Pazartesi menüsü gösteriliyor.';
+          weekNumber = 1;
+          dayOfWeek = 1;
+          targetDate = WEEK_BASE_DATES[1];
+        }
       } else {
-        targetDate = new Date().toISOString().split('T')[0];
+        // Bugün hafta içi! monthly_menu'de bugünün tarihini ara
+        try {
+          const { data: mRows } = await supabase
+            .from('monthly_menu')
+            .select(`
+              id,
+              meal_type,
+              date,
+              week_number,
+              day_of_week,
+              recipes (
+                id,
+                meal_name,
+                meal_type
+              )
+            `)
+            .eq('date', actualToday);
+
+          if (mRows && mRows.length > 0) {
+            menuRows = mRows;
+            weekNumber = mRows[0].week_number;
+            dayOfWeek = mRows[0].day_of_week;
+            notice = null; // Bugünün menüsü başarıyla bulundu!
+          } else {
+            // Bugün hafta içi ama monthly_menu'de bu tarih yok
+            notice = 'Bugün için menü tanımlı değil. 1. Hafta Pazartesi menüsü gösteriliyor.';
+            weekNumber = 1;
+            dayOfWeek = 1;
+            targetDate = WEEK_BASE_DATES[1];
+          }
+        } catch (_) {
+          weekNumber = 1;
+          dayOfWeek = 1;
+          targetDate = WEEK_BASE_DATES[1];
+          notice = 'Bugün için menü tanımlı değil.';
+        }
       }
     }
 
     if (!dayOfWeek) {
-      dayOfWeek = ((new Date(targetDate + 'T12:00:00').getDay() + 6) % 7) + 1;
-      if (dayOfWeek > 5) dayOfWeek = 5; // Haftasonu ise Cuma gününü baz al
+      dayOfWeek = ((new Date((targetDate || actualToday) + 'T12:00:00').getDay() + 6) % 7) + 1;
+      if (dayOfWeek > 5) dayOfWeek = 5;
     }
-
     if (!weekNumber) {
-      const dNum = new Date(targetDate + 'T12:00:00').getDate();
+      const dNum = new Date((targetDate || actualToday) + 'T12:00:00').getDate();
       weekNumber = Math.min(4, Math.max(1, Math.floor((dNum - 1) / 7) + 1));
     }
 
-    // 1. ÖNCELİK 1: monthly_menu tablosunda bu tarih için kayıt var mı?
-    let menuRows = null;
-    try {
-      const { data: mRows, error: mErr } = await supabase
-        .from('monthly_menu')
-        .select(`
-          id,
-          meal_type,
-          menu_date,
-          recipes (
-            id,
-            meal_name,
-            meal_type
-          )
-        `)
-        .eq('menu_date', targetDate);
-
-      if (!mErr && mRows && mRows.length > 0) {
-        menuRows = mRows;
-      }
-    } catch (e) {
-      // monthly_menu yoksa weekly_menu fallback
-    }
-
-    // ÖNCELİK 2: weekly_menu fallback
+    // Fallback: weekly_menu
     if (!menuRows || menuRows.length === 0) {
       const weekValidFrom = WEEK_BASE_DATES[weekNumber] || '2026-09-07';
-      let { data: wRows, error: menuErr } = await supabase
+      let { data: wRows } = await supabase
         .from('weekly_menu')
         .select(`
           id,
@@ -295,11 +421,7 @@ router.get('/today', async (req, res) => {
         .eq('day_of_week', dayOfWeek)
         .eq('valid_from', weekValidFrom);
 
-      if (menuErr) throw menuErr;
-      menuRows = wRows;
-
-      // Fallback: Eğer o valid_from ile bulunamadıysa sadece day_of_week ile dene
-      if (!menuRows || menuRows.length === 0) {
+      if (!wRows || wRows.length === 0) {
         const { data: fallbackRows } = await supabase
           .from('weekly_menu')
           .select(`
@@ -315,17 +437,22 @@ router.get('/today', async (req, res) => {
           `)
           .eq('day_of_week', dayOfWeek);
         menuRows = fallbackRows || [];
+      } else {
+        menuRows = wRows;
       }
     }
 
     if (!menuRows || menuRows.length === 0) {
       return res.json({
-        success: true,
-        date: targetDate,
-        week_number: weekNumber,
-        day_of_week: dayOfWeek,
-        day_name: GUN_ISIMLERI[dayOfWeek] || '',
-        meals: []
+        success:      true,
+        date:         targetDate,
+        actual_today: actualToday,
+        is_today:     (targetDate === actualToday),
+        notice:       notice || 'Bugün için menü tanımlı değil.',
+        week_number:  weekNumber,
+        day_of_week:  dayOfWeek,
+        day_name:     GUN_ISIMLERI[dayOfWeek] || '',
+        meals:        []
       });
     }
 
@@ -388,11 +515,14 @@ router.get('/today', async (req, res) => {
       });
 
     res.json({
-      success:     true,
-      date:        targetDate,
-      week_number: weekNumber,
-      day_of_week: dayOfWeek,
-      day_name:    GUN_ISIMLERI[dayOfWeek] || '',
+      success:      true,
+      date:         targetDate,
+      actual_today: actualToday,
+      is_today:     (targetDate === actualToday),
+      notice:       notice || null,
+      week_number:  weekNumber,
+      day_of_week:  dayOfWeek,
+      day_name:     GUN_ISIMLERI[dayOfWeek] || '',
       meals
     });
 
