@@ -1,45 +1,49 @@
-# Pera Anaokulu Stok Takip & Tüketim Sistemi — Geliştirme Kuralları
+# GELİŞTİRME KURALLARI
 
-Bu dosya, projede yapılacak tüm geliştirme, hata düzeltme ve refaktör işlemlerinde uyulması zorunlu kuralları içerir. **Her görev öncesinde bu dosya okunmalı ve kurallara eksiksiz uyulmalıdır.**
-
----
-
-## 1. Çift Frontend Dizin Senkronizasyonu (KRİTİK)
-- Projede hem `backend/public/` hem de `frontend/` dizinleri bulunmaktadır.
-- Statik arayüz dosyalarında (`index.html`, `style.css`, `app.js`, `manifest.json`, `sw.js`, PWA ikonları vb.) yapılan her değişiklik **her iki dizinde de eşzamanlı olarak birebir aynı (byte-for-byte)** tutulmalıdır.
-- Dosya güncellemelerinde tarayıcı önbellek sorunlarını (caching) önlemek için `index.html` içerisindeki `v=X.X.X` versiyon numaraları artırılmalıdır.
+Bu projede kod yazarken, deploy ederken ve değişiklik yaparken aşağıdaki kurallara uy. Bunlar önceki projede pahalı derslerle öğrenilmiş prensiplerdir.
 
 ---
 
-## 2. Test ve Doğrulama Zorunluluğu
-- Bir değişiklik yapıldıktan sonra asla *"ekledim/düzelttim"* deyip geçilmeyecektir.
-- Yerel sunucu (`node backend/server.js`) ayağa kaldırılarak:
-  1. İlgili API uç noktaları (`curl` / `node` fetch) ile test edilecek,
-  2. Tarayıcıda (Edge/Chrome CDP otomasyonu ile) konsol hataları (`console.error`) kontrol edilecek,
-  3. UI bileşenlerinin (butonlar, modallar, filtreler) tıklanabilirliği ve DOM yansımaları bizzat doğrulanacaktır.
+## Mimari
+- **Dinamik Veriler:** Sık değişen veri (menü, fiyat, stok gibi) veritabanına aittir, kodun içine gömülmez. Koda gömülürse her değişiklikte yeniden deploy gerekir.
+- **Gizli Bilgiler:** Hassas veriler (API anahtarı, token, şifre) koda gömülmez; `process.env` üzerinden environment değişkeninden okunur. Değişken adı birebir tutarlı olmalıdır.
+- **Frontend Dizin Senkronizasyonu:** Projede statik dosyalar hem `backend/public/` hem de `frontend/` dizinlerinde yer alır. Yapılan her arayüz değişikliği her iki klasörde de birebir aynı (senkronize) tutulmalı ve versiyon numarası (`v=X.X.X`) güncellenmelidir.
 
 ---
 
-## 3. Mobil Uyumluluk ve PWA Desteği
-- Yapılan tüm görsel düzenlemeler hem masaüstü hem de mobil (dar ekran, örn: 375px) ekran genişliklerinde test edilmelidir.
-- Taşma (`overflow`), butonların birbirine girmesi veya tıklanamaz hale gelmesi engellenmelidir.
-- PWA manifest (`manifest.json`) ve Service Worker (`sw.js`) bütünlüğü korunmalıdır.
+## Deploy ve Doğrulama
+- **Gerçek Push Kontrolü:** Bir özellik eklediğini söylemeden önce gerçekten commit'leyip push ettiğinden emin ol. "Ekledim" deyip geçme; kodun dosyaya işlendiğini ve push edildiğini doğrula.
+- **Başlangıç Logları:** Yeni bir endpoint eklediğinde, uygulamanın başlangıç loglarında (`server.js`) görünecek şekilde listele — böylece canlıda (Railway) olup olmadığı loglardan doğrulanabilsin.
+- **Commit Raporu:** Değişiklik sonrası commit numarasını (hash) bildir.
 
 ---
 
-## 4. Veri Bütünlüğü ve Sıfırlama Kuralları
-- Sistem sıfırlama işlemlerinde (`/api/settings/reset-system`):
-  - ✅ Temizlenenler: `stock_transactions`, güncel stok miktarları (`current_stock = 0`), öğün geri bildirimleri / test kayıtları.
-  - ⛔ **Kesinlikle Dokunulmayacak Olanlar:** Ürün tanımları (`products`), reçeteler (`recipes`), aylık yemek planı (`monthly_menu`) ve birim alış fiyatları (`unit_price`).
+## Test ve Loglama
+- **Kendin Test Et:** Kod yazdıktan sonra kendin test et: yerel sunucuyu aç, tarayıcı konsolunda JavaScript hatası var mı kontrol et. Buton/işlev gerçekten çalışıyor mu doğrula.
+- **Ham Veri Loglama:** Bir veri akışı kurarken (özellikle AI'dan gelen veriyi işlerken), her adımda ham veriyi logla ki verinin nerede koptuğu görülebilsin.
 
 ---
 
-## 5. Zaman Dilimi Standartları
-- Tüm zamanlayıcılar (`schedulerService.js`), raporlama saatleri ve tarih filtreleri Türkiye Saati (`Europe/Istanbul` - TSİ) standardına göre çalışmalıdır.
+## AI ile Belge Okuma (Fatura, Menü vb.)
+- **Net Prompt:** Prompt net olsun: istenen alanları tek tek say, çıktı formatını dayat (sadece JSON, başka açıklama yok).
+- **Türkçe Sayı Formatı:** Türkçe sayı formatını dikkate al: `"40,00"` = 40 ve `"2.000,00"` = 2000.
+- **Alan Adı Esnekliği:** Zincirin her halkasında (AI çıktısı → ara işlem → backend) alan adları tutarlı olmalı. Backend, aynı verinin birden fazla olası alan adını kabul edecek şekilde esnek yazılmalı.
 
 ---
 
-## 6. Git ve Canlı Dağıtım (Push) Kuralları
-- İş tamamlandığında değişiklikler `git add` ve açıklayıcı bir `git commit` mesajı ile paketlenmeli,
-- `git push origin main` ile uzak sunucuya (GitHub / Railway) gönderilmeli,
-- Kullanıcıya işlemin tamamlandığı teyidi ile birlikte **commit numarası (hash)** raporlanmalıdır.
+## Arayüz
+- **Performans:** Günlük kullanılan ekranlar sade ve hızlı olsun; ağır özellikler (analiz/grafikler gibi) ayrı sekmede dursun.
+- **Mobil Uyumluluk (Responsive):** Her değişiklik mobilde de düzgün çalışsın. Hiçbir sayfa bütün olarak sağa-sola kaymasın; sadece geniş tablolar kendi içinde kaysın.
+- **Doğrudan Olay Bağlama:** Butonlara/işlevlere olay bağlarken gerçekten bağlandığından emin ol; basit, doğrudan bağlama tercih et (`onclick` gibi doğrudan çağrılar).
+
+---
+
+## Güvenlik
+- **Korumalı İşlemler:** Tehlikeli ve geri alınamaz işlemler (veri sıfırlama gibi) korunmalı: gizli konum + şifre kontrolü + onay penceresi + bildirim.
+- **Şifre Yönetimi:** Şifre kontrolü backend'de `process.env` üzerinden yapılmalı, koda gömülmemeli.
+
+---
+
+## Çalışma Tarzı
+- **Bütünsel Yaklaşım:** İlişkili değişiklikleri tek seferde, bütün olarak yap.
+- **Mevcut Yapıyı Koruma:** Var olan, çalışan bir şeyi bozma; değişiklik yaparken diğer özelliklerin çalışmaya devam ettiğinden emin ol.
