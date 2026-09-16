@@ -1157,6 +1157,8 @@ body {
     justify-content: space-between !important;
     align-items: center !important;
     width: 100% !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
   }
 
   /* Sekme Menüsü: Genişliğe sığsın, taşan alt satıra insin, yana taşmasın */
@@ -2758,6 +2760,8 @@ body {
     align-items: center;
     padding-top: 6px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .badge {

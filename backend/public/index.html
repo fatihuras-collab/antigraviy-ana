@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.2.0">
+  <link rel="stylesheet" href="style.css?v=2.3.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -40,10 +40,9 @@
         <div>
           <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <h1 class="header-title">Pera Anaokulu</h1>
-            <button type="button" id="btn-header-settings" class="btn-gear-header" onclick="openSettingsModal()" title="Sistem Ayarları &amp; Stok Sıfırlama" aria-label="Ayarlar">
-              <span class="gear-icon">⚙️</span>
-              <span>Ayarlar</span>
-            </button>
+            <div class="badge" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 9999px;">
+              <span class="setting-age-group">2-6 Yaş Grubu</span>
+            </div>
           </div>
           <p class="header-subtitle">Otomatik Stok Takip &amp; Tüketim Sistemi</p>
         </div>
@@ -53,9 +52,10 @@
           <span class="status-dot"></span>
           <span>Sistem Çevrimiçi</span>
         </div>
-        <div class="badge" style="background: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.3); color: #93c5fd; font-weight: 700; font-size: 0.8rem; padding: 4px 10px; border-radius: 9999px;">
-          <span class="setting-age-group">2-6 Yaş Grubu</span>
-        </div>
+        <button type="button" id="btn-header-settings" class="btn-gear-header" onclick="openSettingsModal()" title="Sistem Ayarları &amp; Stok Sıfırlama" aria-label="Ayarlar">
+          <span class="gear-icon">⚙️</span>
+          <span>Ayarlar</span>
+        </button>
         <div class="date-display" id="today-date-badge">—</div>
       </div>
     </header>
@@ -1122,7 +1122,7 @@
     window.toggleMenuSettings = toggleMenuSettings;
   </script>
 
-  <script src="app.js?v=2.2.0"></script>
+  <script src="app.js?v=2.3.0"></script>
 </body>
 </html>
 
