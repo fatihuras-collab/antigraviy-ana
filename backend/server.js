@@ -132,6 +132,8 @@ app.listen(PORT, HOST, () => {
   console.log(`   Menü parse (AI)     : POST /api/menu/parse`);
   console.log(`   Menü kaydet         : POST /api/menu/save`);
   console.log(`   Analiz verisi       : GET  /api/analytics/summary`);
+  console.log(`   Uygulama ayarları   : GET  /api/settings`);
+  console.log(`   Sistem sıfırlama    : POST /api/settings/reset-system`);
 
   const hasTelegramToken = !!process.env.TELEGRAM_BOT_TOKEN;
   const hasTelegramChat  = !!process.env.TELEGRAM_CHAT_ID;
