@@ -588,13 +588,19 @@ function openSettingsModal() {
     hint.textContent = '* Sıfırla butonunun aktifleşmesi için 4 haneli şifreyi giriniz.';
   }
   
-  modal?.classList.remove('hidden');
+  if (modal) {
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+  }
   setTimeout(() => input?.focus(), 120);
 }
 
 function closeSettingsModal() {
   const modal = document.getElementById('settings-modal');
-  modal?.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 function toggleMenuSettings(forceState) {
@@ -604,6 +610,10 @@ function toggleMenuSettings(forceState) {
     openSettingsModal();
   }
 }
+
+window.openSettingsModal = openSettingsModal;
+window.closeSettingsModal = closeSettingsModal;
+window.toggleMenuSettings = toggleMenuSettings;
 
 let toastTimer = null;
 function showFeedbackToast(text, isError = false) {

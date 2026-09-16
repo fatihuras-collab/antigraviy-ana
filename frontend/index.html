@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=2.1.0">
+  <link rel="stylesheet" href="style.css?v=2.2.0">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -38,7 +38,13 @@
           </svg>
         </div>
         <div>
-          <h1 class="header-title">Pera Anaokulu</h1>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <h1 class="header-title">Pera Anaokulu</h1>
+            <button type="button" id="btn-header-settings" class="btn-gear-header" onclick="openSettingsModal()" title="Sistem Ayarları &amp; Stok Sıfırlama" aria-label="Ayarlar">
+              <span class="gear-icon">⚙️</span>
+              <span>Ayarlar</span>
+            </button>
+          </div>
           <p class="header-subtitle">Otomatik Stok Takip &amp; Tüketim Sistemi</p>
         </div>
       </div>
@@ -357,14 +363,6 @@
               <p class="card-description"><span class="setting-age-group">2-6 yaş grubu</span> • 20 okul günü • Kahvaltı, öğle yemeği ve ikindi ara öğünü</p>
             </div>
           </div>
-          <!-- ⚙️ Dişli İşareti: Ayarlar Butonu -->
-          <button type="button" class="btn btn-outline-sm btn-gear-settings" id="btn-toggle-menu-settings" onclick="openSettingsModal()" title="Sistem Ayarları & Sıfırlama">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            <span id="menu-settings-btn-label">Ayarlar</span>
-          </button>
         </div>
 
         <!-- Hafta Sekmeleri (1. Hafta, 2. Hafta, 3. Hafta, 4. Hafta) -->
@@ -1096,13 +1094,19 @@
         hint.textContent = '* Sıfırla butonunun aktifleşmesi için 4 haneli şifreyi giriniz.';
       }
       
-      modal?.classList.remove('hidden');
+      if (modal) {
+        modal.classList.remove('hidden');
+        modal.style.display = 'flex';
+      }
       setTimeout(function() { input?.focus(); }, 120);
     }
 
     function closeSettingsModal() {
       const modal = document.getElementById('settings-modal');
-      modal?.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+      }
     }
 
     function toggleMenuSettings(forceState) {
@@ -1112,9 +1116,13 @@
         openSettingsModal();
       }
     }
+
+    window.openSettingsModal = openSettingsModal;
+    window.closeSettingsModal = closeSettingsModal;
+    window.toggleMenuSettings = toggleMenuSettings;
   </script>
 
-  <script src="app.js?v=2.1.0"></script>
+  <script src="app.js?v=2.2.0"></script>
 </body>
 </html>
 
