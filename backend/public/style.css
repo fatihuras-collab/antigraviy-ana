@@ -3157,3 +3157,158 @@ body {
   }
 }
 
+/* ── SİSTEM & YEMEKHANE AYARLARI MODALI & DİŞLİ BUTONU ─────────────── */
+.btn-gear-settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e2e8f0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  min-height: 40px;
+}
+
+.btn-gear-settings:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.btn-gear-settings svg {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-gear-settings:hover svg {
+  transform: rotate(60deg);
+}
+
+.settings-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.settings-info-card {
+  background: rgba(15, 23, 42, 0.6);
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.settings-info-label {
+  font-size: 0.74rem;
+  color: #94a3b8;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.settings-info-val {
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.settings-reset-card {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  margin-top: 16px;
+}
+
+.settings-pin-input {
+  font-size: 1.4rem !important;
+  letter-spacing: 0.35em !important;
+  text-align: center !important;
+  height: 46px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  background: rgba(15, 23, 42, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 8px !important;
+  width: 140px !important;
+  transition: all 0.2s ease !important;
+}
+
+.settings-pin-input:focus {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.25) !important;
+  outline: none !important;
+}
+
+.btn-reset-action {
+  height: 46px;
+  padding: 0 22px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  border-radius: 8px;
+  background: #dc2626;
+  border: 1px solid #ef4444;
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-reset-action:disabled {
+  opacity: 0.45 !important;
+  cursor: not-allowed !important;
+  background: rgba(220, 38, 38, 0.3) !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
+  color: #94a3b8 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.btn-reset-action:not(:disabled):hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+}
+
+.manage-alert {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  transition: all 0.2s ease;
+}
+
+@media (max-width: 600px) {
+  .btn-gear-settings {
+    padding: 8px 12px;
+    font-size: 0.82rem;
+    min-height: 42px;
+  }
+
+  .settings-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-reset-card {
+    padding: 14px 14px;
+  }
+
+  .settings-reset-action-row {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .settings-pin-input {
+    width: 100% !important;
+  }
+
+  .btn-reset-action {
+    width: 100% !important;
+  }
+}
+

@@ -358,8 +358,8 @@
             </div>
           </div>
           <!-- ⚙️ Dişli İşareti: Ayarlar Butonu -->
-          <button type="button" class="btn btn-outline-sm" id="btn-toggle-menu-settings" onclick="toggleMenuSettings()" title="Sistem Ayarları & Sıfırlama" style="display: inline-flex; align-items: center; gap: 7px; padding: 7px 14px; font-size: 0.82rem; border-color: rgba(255,255,255,0.18); color: #cbd5e1; border-radius: var(--radius-sm); cursor: pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <button type="button" class="btn btn-outline-sm btn-gear-settings" id="btn-toggle-menu-settings" onclick="openSettingsModal()" title="Sistem Ayarları & Sıfırlama">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
@@ -401,54 +401,6 @@
           <p>• Bu liste örnek taslaktır. Porsiyonlar ve alerjilere yönelik değişiklikler, çocukların ihtiyaçlarına göre okulun diyetisyeniyle netleştirilmelidir.</p>
         </div>
 
-        <!-- ⚙️ SİSTEM AYARLARI VE SIFIRLAMA BÖLÜMÜ (Aylık Menü İçerisinde) -->
-        <div id="menu-settings-section" class="hidden" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255, 255, 255, 0.08); animation: slideUp 0.3s ease;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="font-size: 1.1rem; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-              <span>⚙️</span> Sistem Ayarları &amp; Araçlar
-            </h3>
-            <button type="button" class="btn btn-outline-sm" onclick="toggleMenuSettings(false)" style="padding: 4px 10px; font-size: 0.76rem;">✕ Kapat</button>
-          </div>
-
-          <!-- Sistem Parametreleri Kartı -->
-          <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.06); border-radius: var(--radius-md); padding: 18px 20px; margin-bottom: 16px;">
-            <h4 style="font-size: 0.92rem; margin-bottom: 12px; color: #e2e8f0; font-weight: 700;">📌 Sistem Bilgileri</h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; font-size: 0.84rem; color: #94a3b8;">
-              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-                Hedef Yaş Grubu: <strong style="color: #60a5fa; display: block; margin-top: 2px;">2-6 Yaş Grubu</strong>
-              </div>
-              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-                Zaman Dilimi: <strong style="color: #f1f5f9; display: block; margin-top: 2px;">Europe/Istanbul (TSİ)</strong>
-              </div>
-              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-                Otomatik Akşam Raporu: <strong style="color: #34d399; display: block; margin-top: 2px;">Her Gün 18:00 (Telegram)</strong>
-              </div>
-              <div style="background: rgba(255,255,255,0.02); padding: 10px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.04);">
-                Otomatik Haftalık Rapor: <strong style="color: #a78bfa; display: block; margin-top: 2px;">Her Cuma 12:00 (Telegram)</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- ⚠️ TEHLİKELİ BÖLGE: KORUMALI SİSTEM SIFIRLAMA -->
-          <div style="background: rgba(239, 68, 68, 0.04); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: var(--radius-md); padding: 20px 22px;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 1.35rem;">⚠️</span>
-              <div>
-                <h3 style="color: #fca5a5; font-size: 1.05rem; margin: 0; font-weight: 700;">Tehlikeli Bölge: Stok ve Sistem Sıfırlama</h3>
-                <span class="badge badge-danger" style="font-size: 0.68rem; padding: 2px 7px; margin-top: 4px;">Şifre Korumalı &bull; Geri Alınamaz</span>
-              </div>
-            </div>
-            <p style="font-size: 0.85rem; color: #94a3b8; line-height: 1.6; margin: 12px 0 18px;">
-              Tüm stok hareketlerini (fatura ve tüketim geçmişi), test öğün planlarını ve değerlendirmeleri silerek güncel ürün stoklarını <strong>0</strong> yapar.
-              <br>
-              <span style="color: #cbd5e1;">✅ <strong>Ürün tanımları, reçeteler, aylık menü ve birim alış fiyatlarına kesinlikle dokunulmaz.</strong></span>
-            </p>
-
-            <button type="button" class="btn btn-reset-system" id="btn-open-reset-modal" onclick="openResetConfirmModal()" style="display: inline-flex; width: auto; padding: 10px 22px; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: #fca5a5; font-weight: 600;">
-              <span>🧹 Sistemi Gerçek Kullanıma Hazırla</span>
-            </button>
-          </div>
-        </div>
       </section>
     </main>
 
@@ -942,39 +894,98 @@
     </footer>
   </div>
 
-  <!-- ════ SİSTEM SIFIRLAMA ONAY MODALI ════ -->
-  <div id="system-reset-modal" class="modal-overlay hidden" onclick="if(event.target === this) closeResetConfirmModal()">
-    <div class="modal-dialog" style="max-width: 480px; border-color: rgba(239, 68, 68, 0.35); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(239, 68, 68, 0.15);">
-      <div class="modal-header" style="border-bottom-color: rgba(239, 68, 68, 0.2);">
+  <!-- ════ SİSTEM VE YEMEKHANE AYARLARI MODALI ════ -->
+  <div id="settings-modal" class="modal-overlay hidden" onclick="if(event.target === this) closeSettingsModal()">
+    <div class="modal-dialog" style="max-width: 520px; border-color: rgba(255, 255, 255, 0.15); box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(59, 130, 246, 0.08);">
+      <div class="modal-header">
         <div class="modal-title-wrap">
-          <span class="modal-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;">⚠️</span>
-          <h3 class="modal-title" style="color: #fca5a5;">Sistem Sıfırlama Onayı</h3>
+          <span class="modal-icon" style="font-size: 1.3rem;">⚙️</span>
+          <h3 class="modal-title">Sistem &amp; Yemekhane Ayarları</h3>
         </div>
-        <button class="modal-close-btn" onclick="closeResetConfirmModal()" title="Kapat">✕</button>
+        <button class="modal-close-btn" onclick="closeSettingsModal()" title="Kapat">✕</button>
       </div>
       
-      <div class="modal-body" style="padding: 20px 24px;">
-        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.22); border-radius: 8px; padding: 14px; margin-bottom: 18px; color: #fecaca; font-size: 0.88rem; line-height: 1.55;">
-          Tüm stok geçmişi ve güncel stok silinecek (ürün listesi, reçeteler ve menü kalır). Bu işlem geri alınamaz. Devam etmek için şifre girin.
+      <div class="modal-body" style="padding: 20px 22px;">
+        <!-- Sistem Parametreleri Kartı -->
+        <div style="background: rgba(255, 255, 255, 0.025); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: var(--radius-md); padding: 14px 16px;">
+          <h4 style="font-size: 0.88rem; margin-bottom: 10px; color: #f1f5f9; font-weight: 700; display: flex; align-items: center; gap: 6px;">
+            <span>📌</span> Sistem Bilgileri
+          </h4>
+          <div class="settings-info-grid">
+            <div class="settings-info-card">
+              <span class="settings-info-label">Hedef Yaş Grubu</span>
+              <span class="settings-info-val" style="color: #60a5fa;">2-6 Yaş Grubu</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="settings-info-label">Zaman Dilimi</span>
+              <span class="settings-info-val" style="color: #f1f5f9;">Europe/Istanbul (TSİ)</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="settings-info-label">Otomatik Akşam Raporu</span>
+              <span class="settings-info-val" style="color: #34d399;">Her Gün 18:00 (Telegram)</span>
+            </div>
+            <div class="settings-info-card">
+              <span class="settings-info-label">Otomatik Haftalık Rapor</span>
+              <span class="settings-info-val" style="color: #a78bfa;">Her Cuma 12:00 (Telegram)</span>
+            </div>
+          </div>
         </div>
 
-        <div class="mf-group">
-          <label class="mf-label" style="color: #e2e8f0; font-weight: 600;">4 Haneli Yönetici Şifresi *</label>
-          <input type="password" id="reset-password-input" class="mf-input" maxlength="4" placeholder="••••" style="font-size: 1.4rem; letter-spacing: 0.4em; text-align: center; height: 48px;" onkeydown="if(event.key==='Enter') executeSystemReset()">
-        </div>
+        <!-- ⚠️ TEHLİKELİ BÖLGE: KORUMALI STOK SIFIRLAMA -->
+        <div class="settings-reset-card">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 6px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 1.25rem;">⚠️</span>
+              <h4 style="color: #fca5a5; font-size: 0.98rem; margin: 0; font-weight: 700;">Stok Sıfırlama</h4>
+            </div>
+            <span class="badge badge-danger" style="font-size: 0.68rem; padding: 3px 8px;">Şifre Korumalı &bull; Geri Alınamaz</span>
+          </div>
 
-        <div id="reset-modal-alert" class="manage-alert hidden" style="margin-top: 14px;"></div>
+          <p style="font-size: 0.82rem; color: #94a3b8; line-height: 1.55; margin: 8px 0 16px;">
+            Tüm stok hareketlerini (fatura ve tüketim geçmişi), test öğün planlarını ve değerlendirmeleri silerek güncel ürün stoklarını <strong>0</strong> yapar.
+            <br>
+            <span style="color: #cbd5e1; display: inline-block; margin-top: 4px;">✅ <strong>Ürün tanımları, reçeteler, aylık menü ve birim alış fiyatlarına kesinlikle dokunulmaz.</strong></span>
+          </p>
+
+          <div style="background: rgba(15, 23, 42, 0.5); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; padding: 14px;">
+            <label for="settings-reset-password-input" style="display: block; font-size: 0.8rem; font-weight: 600; color: #f87171; margin-bottom: 8px;">
+              4 Haneli Yönetici Şifresi:
+            </label>
+            <div class="settings-reset-action-row" style="display: flex; gap: 10px; align-items: center;">
+              <input type="password" 
+                     id="settings-reset-password-input" 
+                     class="settings-pin-input" 
+                     maxlength="4" 
+                     placeholder="••••" 
+                     autocomplete="off"
+                     oninput="onSettingsResetPasswordInput(this)"
+                     onkeydown="if(event.key==='Enter' && !document.getElementById('btn-settings-reset').disabled) executeSettingsReset()">
+              
+              <button type="button" 
+                      id="btn-settings-reset" 
+                      class="btn-reset-action" 
+                      disabled 
+                      onclick="executeSettingsReset()" 
+                      title="Şifre doğru girildiğinde aktifleşir">
+                <span id="settings-reset-spinner" class="btn-spinner hidden"></span>
+                <span id="settings-reset-btn-text">Sıfırla</span>
+              </button>
+            </div>
+            <span id="settings-reset-pin-hint" style="display: block; font-size: 0.74rem; color: #94a3b8; margin-top: 8px; transition: color 0.2s ease;">
+              * Sıfırla butonunun aktifleşmesi için 4 haneli şifreyi giriniz.
+            </span>
+          </div>
+
+          <div id="settings-reset-alert" class="manage-alert hidden" style="margin-top: 14px;"></div>
+        </div>
       </div>
 
-      <div class="modal-footer" style="border-top-color: rgba(255, 255, 255, 0.06); display: flex; justify-content: flex-end; gap: 10px;">
-        <button type="button" class="btn btn-outline-sm" onclick="closeResetConfirmModal()" style="width: auto; padding: 8px 18px;">İptal</button>
-        <button type="button" class="btn btn-danger" id="btn-execute-reset" onclick="executeSystemReset()" style="width: auto; padding: 8px 20px; background: #dc2626; border-color: #ef4444; color: #ffffff;">
-          <span id="execute-reset-spinner" class="btn-spinner hidden"></span>
-          <span>Sıfırlamayı Onayla</span>
-        </button>
+      <div class="modal-footer" style="padding: 12px 22px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-outline-sm" onclick="closeSettingsModal()" style="padding: 8px 18px; border-radius: 6px;">Kapat</button>
       </div>
     </div>
   </div>
+
 
   <!-- ════ ÜRÜN DÜZENLEME MODALI (POPUP PENCERE) ════ -->
   <div id="product-edit-modal" class="modal-overlay hidden" onclick="if(event.target === this) closeProductEditModal()">

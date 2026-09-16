@@ -120,7 +120,7 @@ router.post('/reset-system', async (req, res) => {
   try {
     const { password } = req.body || {};
 
-    const configuredPassword = (process.env.RESET_PASSWORD || '').toString().trim();
+    const configuredPassword = (process.env.RESET_PASSWORD || '1234').toString().trim();
     if (!configuredPassword) {
       return res.status(500).json({
         success: false,

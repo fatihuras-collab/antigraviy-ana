@@ -566,26 +566,42 @@ function jumpToEvaluation(week, day) {
   selectFeedbackDay(day);
 }
 
+function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const input = document.getElementById('settings-reset-password-input');
+  const btn = document.getElementById('btn-settings-reset');
+  const alertEl = document.getElementById('settings-reset-alert');
+  const hint = document.getElementById('settings-reset-pin-hint');
+  
+  if (alertEl) {
+    alertEl.classList.add('hidden');
+    alertEl.innerHTML = '';
+  }
+  if (input) {
+    input.value = '';
+  }
+  if (btn) {
+    btn.disabled = true;
+  }
+  if (hint) {
+    hint.style.color = '#94a3b8';
+    hint.textContent = '* Sıfırla butonunun aktifleşmesi için 4 haneli şifreyi giriniz.';
+  }
+  
+  modal?.classList.remove('hidden');
+  setTimeout(() => input?.focus(), 120);
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  modal?.classList.add('hidden');
+}
+
 function toggleMenuSettings(forceState) {
-  const section = document.getElementById('menu-settings-section');
-  const btn = document.getElementById('btn-toggle-menu-settings');
-  const label = document.getElementById('menu-settings-btn-label');
-  if (!section) return;
-
-  const isCurrentlyHidden = section.classList.contains('hidden');
-  const makeVisible = forceState !== undefined ? forceState : isCurrentlyHidden;
-
-  if (makeVisible) {
-    section.classList.remove('hidden');
-    btn?.classList.add('tab-active');
-    if (label) label.textContent = '✕ Kapat';
-    setTimeout(() => {
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+  if (forceState === false) {
+    closeSettingsModal();
   } else {
-    section.classList.add('hidden');
-    btn?.classList.remove('tab-active');
-    if (label) label.textContent = 'Ayarlar';
+    openSettingsModal();
   }
 }
 
@@ -1567,51 +1583,91 @@ async function saveAgeSetting() {
   }
 }
 
-// ── Sistemi Gerçek Kullanıma Hazırla (Şifre Korumalı Modal) ────────────────
-function openResetConfirmModal() {
-  const modal = document.getElementById('system-reset-modal');
-  const input = document.getElementById('reset-password-input');
-  const alertEl = document.getElementById('reset-modal-alert');
-  if (alertEl) {
+// ── Bildirim / Alert Yardımcısı ─────────────────────────────────────────────
+function showManageAlert(el, msg, type = 'info') {
+  if (!el) return;
+  el.className = 'manage-alert';
+  if (type === 'err' || type === 'error') {
+    el.style.background = 'rgba(239, 68, 68, 0.15)';
+    el.style.border = '1px solid rgba(239, 68, 68, 0.4)';
+    el.style.color = '#fca5a5';
+  } else if (type === 'ok' || type === 'success') {
+    el.style.background = 'rgba(16, 185, 129, 0.15)';
+    el.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+    el.style.color = '#6ee7b7';
+  } else {
+    el.style.background = 'rgba(59, 130, 246, 0.15)';
+    el.style.border = '1px solid rgba(59, 130, 246, 0.4)';
+    el.style.color = '#93c5fd';
+  }
+  el.style.padding = '10px 14px';
+  el.style.borderRadius = '8px';
+  el.style.fontSize = '0.84rem';
+  el.style.lineHeight = '1.45';
+  el.style.display = 'block';
+  el.innerHTML = msg;
+  el.classList.remove('hidden');
+}
+
+// ── Şifre Girişi Dinleyicisi (4 hane girilmeden buton pasif kalır) ───────────
+function onSettingsResetPasswordInput(el) {
+  const val = (el?.value || '').trim();
+  const btn = document.getElementById('btn-settings-reset');
+  const alertEl = document.getElementById('settings-reset-alert');
+  const hint = document.getElementById('settings-reset-pin-hint');
+
+  if (alertEl && !alertEl.classList.contains('hidden')) {
     alertEl.classList.add('hidden');
     alertEl.innerHTML = '';
   }
-  if (input) {
-    input.value = '';
+
+  if (!btn) return;
+
+  if (val.length === 4) {
+    btn.disabled = false;
+    if (hint) {
+      hint.style.color = '#34d399';
+      hint.textContent = '✓ 4 haneli şifre girildi, sıfırlama butonuna basabilirsiniz.';
+    }
+  } else {
+    btn.disabled = true;
+    if (hint) {
+      hint.style.color = '#94a3b8';
+      hint.textContent = '* Sıfırla butonunun aktifleşmesi için 4 haneli şifreyi giriniz.';
+    }
   }
-  modal?.classList.remove('hidden');
-  setTimeout(() => input?.focus(), 100);
 }
 
-function closeResetConfirmModal() {
-  const modal = document.getElementById('system-reset-modal');
-  const input = document.getElementById('reset-password-input');
-  const alertEl = document.getElementById('reset-modal-alert');
-  if (alertEl) {
-    alertEl.classList.add('hidden');
-    alertEl.innerHTML = '';
-  }
-  if (input) {
-    input.value = '';
-  }
-  modal?.classList.add('hidden');
-}
-
-async function executeSystemReset() {
-  const input = document.getElementById('reset-password-input');
-  const btn = document.getElementById('btn-execute-reset');
-  const spinner = document.getElementById('execute-reset-spinner');
-  const alertEl = document.getElementById('reset-modal-alert');
+// ── Şifre Korumalı Stok Sıfırlama Çalıştırıcı ────────────────────────────────
+async function executeSettingsReset() {
+  const input = document.getElementById('settings-reset-password-input');
+  const btn = document.getElementById('btn-settings-reset');
+  const spinner = document.getElementById('settings-reset-spinner');
+  const btnText = document.getElementById('settings-reset-btn-text');
+  const alertEl = document.getElementById('settings-reset-alert');
+  const hint = document.getElementById('settings-reset-pin-hint');
 
   const password = input?.value?.trim();
-  if (!password) {
-    showManageAlert(alertEl, 'Lütfen 4 haneli şifreyi girin.', 'err');
+  if (!password || password.length !== 4) {
+    showManageAlert(alertEl, 'Lütfen 4 haneli şifreyi eksiksiz girin.', 'err');
     input?.focus();
+    return;
+  }
+
+  // Güvenlik teyidi (tarayıcı penceresi)
+  const confirmReset = confirm(
+    '⚠️ DİKKAT: Tüm stok hareketleri (fatura ve tüketim geçmişi) silinecek, ürün stokları 0 yapılacaktır!\n\n' +
+    'Ürün tanımları, reçeteler, birim fiyatlar ve aylık menü korunacaktır.\n\n' +
+    'Devam etmek istediğinize emin misiniz?'
+  );
+
+  if (!confirmReset) {
     return;
   }
 
   if (btn) btn.disabled = true;
   spinner?.classList.remove('hidden');
+  if (btnText) btnText.textContent = 'Sıfırlanıyor...';
   if (alertEl) alertEl.classList.add('hidden');
 
   try {
@@ -1624,35 +1680,58 @@ async function executeSystemReset() {
     const data = await res.json();
 
     if (!res.ok || !data.success) {
-      showManageAlert(alertEl, data.error || 'şifre hatalı', 'err');
+      const errMsg = data.error || 'Şifre hatalı';
+      showManageAlert(alertEl, '❌ ' + errMsg, 'err');
       if (input) {
         input.value = '';
         input.focus();
       }
+      if (btn) btn.disabled = true;
+      if (hint) {
+        hint.style.color = '#f87171';
+        hint.textContent = '❌ Şifre hatalı, lütfen tekrar deneyin.';
+      }
       return;
     }
 
-    showManageAlert(alertEl, data.message || 'Sistem sıfırlandı!', 'ok');
+    showManageAlert(alertEl, '✅ ' + (data.message || 'Stok verileri başarıyla sıfırlandı! Telegram bildirimi iletildi.'), 'ok');
+    if (input) input.value = '';
 
-    // Ürün listesini ve diğer verileri güncelle
-    await loadProducts();
+    // Ürün listesini ve stok durumlarını arka planda yenile
+    if (typeof loadProducts === 'function') {
+      try { await loadProducts(); } catch (_) {}
+    }
+    if (typeof loadStockSummary === 'function') {
+      try { await loadStockSummary(); } catch (_) {}
+    }
     if (typeof loadFeedbackMeals === 'function') {
       try { await loadFeedbackMeals(); } catch (_) {}
     }
 
     setTimeout(() => {
-      closeResetConfirmModal();
-      alert('✅ Sistem gerçek kullanıma hazırlandı! Stok geçmişi sıfırlandı.');
-      switchTab('consumption');
-    }, 1200);
+      closeSettingsModal();
+      alert('✅ Stok verileri sıfırlandı ve Telegram bildirimi iletildi.');
+      if (typeof switchTab === 'function') {
+        switchTab('consumption');
+      }
+    }, 1500);
 
   } catch (err) {
     showManageAlert(alertEl, 'Bağlantı hatası: ' + err.message, 'err');
   } finally {
-    if (btn) btn.disabled = false;
     spinner?.classList.add('hidden');
+    if (btnText) btnText.textContent = 'Sıfırla';
+    if (btn && input?.value?.length !== 4) {
+      btn.disabled = true;
+    }
   }
 }
+
+// Geriye dönük takma adlar (backward compatibility)
+const openResetConfirmModal  = openSettingsModal;
+const closeResetConfirmModal = closeSettingsModal;
+const executeSystemReset     = executeSettingsReset;
+
 
 
 // =============================================================================
@@ -2628,4 +2707,11 @@ function renderWeeklyCostChart() {
     }
   });
 }
+
+// ESC tuşu ile Ayarlar modalını kapatma desteği
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeSettingsModal();
+  }
+});
 
